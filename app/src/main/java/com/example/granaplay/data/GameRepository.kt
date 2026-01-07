@@ -34,8 +34,8 @@ class GameRepository(private val gameDao: GameDao) {
     // --- Inicialização de Dados (Seed) ---
     // Útil para criar dados falsos quando o app abre pela primeira vez
     suspend fun popularBancoInicial() {
-        val modulo1Id = gameDao.inserirModulo(Modulo(nome = "Educação Financeira Básica", descricao = "Aprendendo sobre educação financeira"))
-        gameDao.inserirLicao(Licao(nome = "O que é Dinheiro?", descricao = "História do dinheiro", pontuacao = 10, idModulo = modulo1Id))
-        gameDao.inserirLicao(Licao(nome = "Poupando", descricao = "A importância de guardar", pontuacao = 15, idModulo = modulo1Id))
+        val modulo1Id = gameDao.inserirModulo(Modulo(nome = "Educação Financeira Básica", descricao = "Aprendendo sobre educação financeira", ordem = 1))
+        gameDao.inserirLicao(Licao(nome = "O que é Dinheiro?", descricao = "História do dinheiro", pontuacao = 10, idModulo = modulo1Id, ordem = 1))
+        gameDao.inserirLicao(Licao(nome = "Poupando", descricao = "A importância de guardar", pontuacao = 15, idModulo = modulo1Id, ordem = 2))
     }
 }

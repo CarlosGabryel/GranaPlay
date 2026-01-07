@@ -7,5 +7,6 @@ import androidx.room.PrimaryKey
 data class Modulo(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val nome: String,
-    val descricao: String
+    val descricao: String,
+    val ordem: Int // Para controlar visualmente quem vem primeiro na trilha
 )

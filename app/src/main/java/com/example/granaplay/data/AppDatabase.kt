@@ -6,8 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Usuario::class, Modulo::class, Licao::class, UsuarioLicao::class],
-    version = 1
+    entities = [Usuario::class, Modulo::class, Licao::class, UsuarioLicao::class, Questao::class, Alternativa::class],
+    version = 2
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun gameDao(): GameDao
@@ -22,7 +22,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "granaplay_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

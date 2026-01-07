@@ -20,5 +20,6 @@ data class Licao(
     val nome: String,
     val descricao: String,
     val pontuacao: Int,
+    val ordem: Int, // Para controlar visualmente quem vem primeiro na trilha
     val idModulo: Long // Chave estrangeira
 )

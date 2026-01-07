@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
+import com.example.granaplay.data.Questao
 
 @Dao
 interface GameDao {
@@ -37,4 +38,16 @@ interface GameDao {
 
     @Query("SELECT EXISTS(SELECT * FROM usuario_licoes WHERE idUsuario = :userId AND idLicao = :licaoId)")
     suspend fun isLicaoConcluida(userId: Long, licaoId: Long): Boolean
+
+    // Novo: Buscar questões de uma lição
+    @Query("SELECT * FROM questoes WHERE licaoId = :licaoId")
+    suspend fun getQuestoesDaLicao(licaoId: Long): List<Questao>
+
+    // Novo: Buscar alternativas de uma questão
+    @Query("SELECT * FROM alternativas WHERE questaoId = :questaoId")
+    suspend fun getAlternativasDaQuestao(questaoId: Long): List<Alternativa>
+
+    // Opcional: Atualizar Vidas (Necessário para o fluxo de erro do quiz) [cite: 130]
+    @Query("UPDATE usuarios SET pontosSaude = :novasVidas WHERE id = :id")
+    suspend fun atualizarVidas(id: Long, novasVidas: Int)
 }

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("kotlin-kapt")
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -34,8 +35,13 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
     buildFeatures {
-        viewBinding = true
+        compose = true // Habilita o Compose
+        viewBinding = true // Útil para conectar com XML antigo
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.1" // Verifique a versão compatível com seu Kotlin
     }
 }
 
@@ -62,4 +68,17 @@ dependencies {
 
     // (Opcional) Se precisar de extensões de runtime
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:${lifecycle_version}")
+
+    // Dependências do Compose (BoM garante versões compatíveis)
+    val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3") // Material 3
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Ícones estendidos (necessário para ter todos os ícones da imagem)
+    implementation("androidx.compose.material:material-icons-extended")
 }

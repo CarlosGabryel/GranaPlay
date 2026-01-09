@@ -4,39 +4,47 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
-import com.example.granaplay.databinding.FragmentHomeBinding
 
 class HomeFragment : Fragment() {
-
-    private var _binding: FragmentHomeBinding? = null
-
-    // This property is only valid between onCreateView and
-    // onDestroyView.
-    private val binding get() = _binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val homeViewModel =
-            ViewModelProvider(this).get(HomeViewModel::class.java)
+        // REMOVIDO: Não precisamos mais manipular window flags aqui.
+        // A MainActivity já cuida do edge-to-edge.
 
-        _binding = FragmentHomeBinding.inflate(inflater, container, false)
-        val root: View = binding.root
+        return ComposeView(requireContext()).apply {
+            setContent {
+                val backgroundColor = Color(0xFFDFF3FF)
 
-        val textView: TextView = binding.textHome
-        homeViewModel.text.observe(viewLifecycleOwner) {
-            textView.text = it
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(backgroundColor)
+                        // CORREÇÃO: Usa apenas statusBarsPadding.
+                        // Isso garante o padding no topo (bateria/hora),
+                        // mas deixa o fundo azul descer até o final da tela.
+                        .statusBarsPadding()
+                ) {
+                    // Adicione um padding bottom no CONTEÚDO (não no fundo)
+                    // para que os itens da lista não fiquem escondidos atrás do menu
+                    Box(modifier = Modifier.padding(bottom = 80.dp)) {
+                        // Seu conteúdo da Home (Textos, Listas, etc) vem aqui
+                    }
+                }
+            }
         }
-        return root
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
     }
 }

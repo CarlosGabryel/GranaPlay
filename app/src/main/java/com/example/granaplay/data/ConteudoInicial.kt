@@ -1,7 +1,7 @@
 package com.example.granaplay.data
 
-// Estruturas auxiliares apenas para facilitar a criação dos dados
-data class SeedModulo(val id: Int, val titulo: String, val licoes: List<SeedLicao>)
+// ALTERAÇÃO 1: Adicionei 'val descricao: String' aqui
+data class SeedModulo(val id: Int, val titulo: String, val descricao: String, val licoes: List<SeedLicao>)
 data class SeedLicao(val id: Int, val titulo: String, val questoes: List<SeedQuestao>)
 data class SeedQuestao(
     val tipo: String,
@@ -13,8 +13,12 @@ data class SeedQuestao(
 
 object ConteudoInicial {
     val dados = listOf(
+        // --- MÓDULO 1 ---
         SeedModulo(
-            1, "Conhecendo o Dinheiro", listOf(
+            1,
+            "Conhecendo o Dinheiro",
+            "Primeiros passos com o dinheiro", // <--- Descrição personalizada
+            listOf(
                 SeedLicao(101, "O que são moedas?", listOf(
                     SeedQuestao("TEXT_2", "As MOEDAS são feitas de metal. Elas são duras e fazem 'plim' quando caem no chão! Você entendeu?", listOf("Entendi, são de metal!", "Não, são de algodão."), 0),
                     SeedQuestao("IMAGE_4", "Toque na imagem que mostra uma MOEDA de verdade:", listOf("Moeda de 1 Real", "Botão de camisa", "Tampinha de garrafa", "Pedra redonda"), 0, listOf("img_moeda_real", "img_botao", "img_tampinha", "img_pedra")),
@@ -41,8 +45,12 @@ object ConteudoInicial {
                 ))
             )
         ),
+        // --- MÓDULO 2 ---
         SeedModulo(
-            2, "A Origem da Grana", listOf(
+            2,
+            "A Origem da Grana",
+            "Como o dinheiro chega até você", // <--- Descrição personalizada
+            listOf(
                 SeedLicao(201, "Ganhando a Mesada", listOf(
                     SeedQuestao("TEXT_2", "O que é MESADA?", listOf("Dinheiro que os pais dão para ensinar a usar", "Um presente de aniversário"), 0),
                     SeedQuestao("TEXT_2", "A mesada é infinita (nunca acaba)?", listOf("Não, ela acaba se gastar tudo", "Sim, posso comprar o mundo"), 0),
@@ -60,6 +68,34 @@ object ConteudoInicial {
                     SeedQuestao("IMAGE_4", "Quem recebe salário no final do mês?", listOf("A médica que trabalhou", "O gato que dormiu", "O bebê", "O boneco"), 0, listOf("img_medica", "img_gato", "img_bebe", "img_boneco")),
                     SeedQuestao("TEXT_2", "Para que serve o salário dos pais?", listOf("Pagar as contas da casa e comida", "Jogar aviõezinhos de papel"), 0),
                     SeedQuestao("TEXT_2", "O salário cai do céu?", listOf("Não, precisa trabalhar para receber", "Sim, cai todo dia"), 0)
+                ))
+            )
+        ),
+        // --- MÓDULO 3 ---
+        SeedModulo(
+            3,
+            "Poupando pro Futuro",
+            "Protegendo o que você conquistou", // <--- Descrição personalizada
+            listOf(
+                SeedLicao(301, "O Poder do Cofrinho", listOf(
+                    SeedQuestao("TEXT_2", "O que significa 'poupar'?", listOf("Guardar um pouco hoje para usar depois", "Gastar tudo agora"), 0),
+                    SeedQuestao("IMAGE_4", "Qual destes objetos serve para guardar dinheiro?", listOf("Cofrinho", "Panela", "Sapato furado", "Balde de água"), 0, listOf("img_cofrinho", "img_panela", "img_sapato", "img_balde")),
+                    SeedQuestao("TEXT_2", "Se você guardar 1 moeda todo dia, o que acontece no final do mês?", listOf("Terei muitas moedas!", "As moedas somem"), 0),
+                    SeedQuestao("TEXT_2", "Poupar ajuda a gente a:", listOf("Realizar sonhos maiores", "Ficar triste"), 0)
+                ))
+            )
+        ),
+        // --- MÓDULO 4 ---
+        SeedModulo(
+            4,
+            "Comprando Bem",
+            "Aprenda a gastar com consciência", // <--- Descrição personalizada
+            listOf(
+                SeedLicao(401, "Quero ou Preciso?", listOf(
+                    SeedQuestao("TEXT_2", "Você precisa de água para viver. Isso é uma:", listOf("Necessidade", "Brincadeira"), 0),
+                    SeedQuestao("IMAGE_4", "O que é mais importante comprar primeiro?", listOf("Comida saudável", "Muitos doces", "Brinquedo caro", "Videogame"), 0, listOf("img_comida", "img_doces", "img_brinquedo", "img_videogame")),
+                    SeedQuestao("TEXT_2", "Antes de comprar algo caro, o que devemos fazer?", listOf("Pensar se realmente precisamos", "Chorar na loja"), 0),
+                    SeedQuestao("TEXT_2", "Dinheiro nasce em árvore?", listOf("Não, precisa de esforço para ganhar", "Sim, é só plantar"), 0)
                 ))
             )
         )

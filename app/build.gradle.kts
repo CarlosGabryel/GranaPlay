@@ -81,4 +81,6 @@ dependencies {
 
     // Ícones estendidos (necessário para ter todos os ícones da imagem)
     implementation("androidx.compose.material:material-icons-extended")
+
+    implementation("androidx.compose.runtime:runtime-livedata:1.6.0")
 }

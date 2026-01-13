@@ -1,87 +1,141 @@
 package com.example.granaplay.ui
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.example.granaplay.GranaPlayApplication
-import com.example.granaplay.databinding.ActivityAuthBinding
 import com.example.granaplay.MainActivity
+import com.example.granaplay.data.GameRepository
+import com.example.granaplay.databinding.ActivityAuthBinding
 
 class AuthActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAuthBinding
 
-
-
-
-
-    // Inicializando o ViewModel usando a Factory que criamos na Application
+    // Inicializa o ViewModel usando a Factory correta
     private val viewModel: AuthViewModel by viewModels {
-        GameViewModelFactory((application as GranaPlayApplication).repository)
+        AuthViewModelFactory((application as GranaPlayApplication).repository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         binding = ActivityAuthBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setupEdgeToEdge() // Visual moderno (igual à MainActivity)
         setupListeners()
         setupObservers()
     }
 
+    // ========================================================================
+    // CONFIGURAÇÃO DE UI E SISTEMA
+    // ========================================================================
+
+    private fun setupEdgeToEdge() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        // Ícones escuros na barra de status (pois o fundo da tela de login geralmente é claro)
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
+    }
+
+    // ========================================================================
+    // LISTENERS (BOTÕES)
+    // ========================================================================
+
     private fun setupListeners() {
         binding.btnLogin.setOnClickListener {
-            val email = binding.etEmail.text.toString()
-            val senha = binding.etSenha.text.toString()
-
-            if (email.isNotBlank() && senha.isNotBlank()) {
-                viewModel.login(email, senha)
-            } else {
-                Toast.makeText(this, "Preencha email e senha", Toast.LENGTH_SHORT).show()
-            }
+            handleLogin()
         }
 
         binding.btnCadastrar.setOnClickListener {
-            val nome = binding.etNome.text.toString()
-            val email = binding.etEmail.text.toString()
-            val senha = binding.etSenha.text.toString()
-
-            if (nome.isNotBlank() && email.isNotBlank() && senha.isNotBlank()) {
-                viewModel.cadastrar(nome, email, senha)
-            } else {
-                Toast.makeText(this, "Preencha todos os campos para cadastrar", Toast.LENGTH_SHORT).show()
-            }
+            handleCadastro()
         }
     }
 
+    private fun handleLogin() {
+        val email = binding.etEmail.text.toString()
+        val senha = binding.etSenha.text.toString()
+
+        if (validarCampos(email, senha)) {
+            viewModel.login(email, senha)
+        } else {
+            exibirMensagem("Preencha email e senha")
+        }
+    }
+
+    private fun handleCadastro() {
+        val nome = binding.etNome.text.toString()
+        val email = binding.etEmail.text.toString()
+        val senha = binding.etSenha.text.toString()
+
+        if (validarCampos(nome, email, senha)) {
+            viewModel.cadastrar(nome, email, senha)
+        } else {
+            exibirMensagem("Preencha todos os campos para cadastrar")
+        }
+    }
+
+    /**
+     * Valida se uma lista de strings não está vazia.
+     * Retorna true se todos os campos tiverem texto.
+     */
+    private fun validarCampos(vararg campos: String): Boolean {
+        return campos.all { it.isNotBlank() }
+    }
+
+    // ========================================================================
+    // OBSERVERS (RESPOSTAS DO VIEWMODEL)
+    // ========================================================================
+
     private fun setupObservers() {
-        // Observa Sucesso no Login
+        // Sucesso no Login -> Vai para o Jogo
         viewModel.loginResult.observe(this) { sucesso ->
             if (sucesso) {
-                Toast.makeText(this, "Login realizado!", Toast.LENGTH_SHORT).show()
-
-                val intent = Intent(this, MainActivity::class.java)
-                startActivity(intent)
-                finish()
+                irParaMainActivity()
             }
         }
 
-        // Observa Sucesso no Cadastro
+        // Sucesso no Cadastro -> Feedback visual
         viewModel.cadastroResult.observe(this) { sucesso ->
             if (sucesso) {
-                Toast.makeText(this, "Cadastro realizado! Faça login.", Toast.LENGTH_SHORT).show()
-                // Limpar campos ou já logar direto se quiser
-                binding.etNome.text.clear()
+                exibirMensagem("Cadastro realizado! Faça login.")
+                limparCamposCadastro()
             }
         }
 
-        // Observa Erros
+        // Erros -> Toast
         viewModel.errorMessage.observe(this) { erro ->
-            erro?.let {
-                Toast.makeText(this, it, Toast.LENGTH_LONG).show()
-            }
+            erro?.let { exibirMensagem(it) }
         }
+    }
+
+    // ========================================================================
+    // NAVEGAÇÃO E UTILITÁRIOS
+    // ========================================================================
+
+    private fun irParaMainActivity() {
+        val intent = Intent(this, MainActivity::class.java)
+        // Limpa a pilha para que o usuário não volte ao login ao apertar "Voltar"
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun limparCamposCadastro() {
+        binding.etNome.text.clear()
+        // Opcional: limpar senha também
+        binding.etSenha.text.clear()
+    }
+
+    private fun exibirMensagem(mensagem: String) {
+        Toast.makeText(this, mensagem, Toast.LENGTH_SHORT).show()
     }
 }

@@ -3,6 +3,7 @@ package com.example.granaplay.ui
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.granaplay.data.GameRepository
 import com.example.granaplay.data.Usuario
@@ -10,7 +11,13 @@ import kotlinx.coroutines.launch
 
 class AuthViewModel(private val repository: GameRepository) : ViewModel() {
 
-    // LiveData para observar o resultado do Login/Cadastro na Activity
+    // ========================================================================
+    // ESTADOS (LIVE DATA)
+    // ========================================================================
+
+    private val _isLoading = MutableLiveData(false)
+    val isLoading: LiveData<Boolean> = _isLoading
+
     private val _loginResult = MutableLiveData<Boolean>()
     val loginResult: LiveData<Boolean> = _loginResult
 
@@ -20,38 +27,87 @@ class AuthViewModel(private val repository: GameRepository) : ViewModel() {
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> = _errorMessage
 
-    // Função de Login
+    // ========================================================================
+    // LÓGICA DE LOGIN
+    // ========================================================================
+
     fun login(email: String, senha: String) {
         viewModelScope.launch {
-            val usuario = repository.buscarUsuarioPorEmail(email)
-            if (usuario != null && usuario.senha == senha) {
-                // Login Sucesso
-                // Dica: Aqui você poderia salvar o ID do usuário em SharedPreferences para manter logado
-                _loginResult.value = true
-            } else {
-                _errorMessage.value = "Email ou senha incorretos."
-                _loginResult.value = false
+            try {
+                _isLoading.value = true
+                _errorMessage.value = null // Limpa erros anteriores
+
+                val usuario = repository.buscarUsuarioPorEmail(email)
+
+                // NOTA DE SEGURANÇA: Em um app real, compare Hashes, nunca texto puro!
+                if (usuario != null && usuario.senha == senha) {
+                    // SUCESSO
+                    // Dica: Aqui seria o lugar ideal para salvar o usuario.id no SharedPreferences
+                    // Ex: sessionManager.saveUserId(usuario.id)
+                    _loginResult.value = true
+                } else {
+                    // FALHA
+                    _errorMessage.value = "Email ou senha incorretos."
+                    _loginResult.value = false
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Erro ao fazer login: ${e.message}"
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    // Função de Cadastro
+    // ========================================================================
+    // LÓGICA DE CADASTRO
+    // ========================================================================
+
     fun cadastrar(nome: String, email: String, senha: String) {
         viewModelScope.launch {
-            // Verifica se já existe
-            val existente = repository.buscarUsuarioPorEmail(email)
-            if (existente != null) {
-                _errorMessage.value = "Este email já está cadastrado."
+            try {
+                _isLoading.value = true
+                _errorMessage.value = null
+
+                // 1. Verifica duplicidade
+                val existente = repository.buscarUsuarioPorEmail(email)
+
+                if (existente != null) {
+                    _errorMessage.value = "Este email já está cadastrado."
+                    _cadastroResult.value = false
+                } else {
+                    // 2. Cria e Salva
+                    val novoUsuario = Usuario(
+                        nome = nome,
+                        email = email,
+                        senha = senha
+                    )
+                    repository.cadastrarUsuario(novoUsuario)
+
+                    // 3. Opcional: Popular banco inicial se necessário
+                    // repository.verificarEPopularBanco()
+
+                    _cadastroResult.value = true
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Erro ao cadastrar: ${e.message}"
                 _cadastroResult.value = false
-            } else {
-                val novoUsuario = Usuario(nome = nome, email = email, senha = senha)
-                repository.cadastrarUsuario(novoUsuario)
-
-                // Opcional: Popular dados iniciais do jogo (modulos/lições) se for o primeiro user
-                // repository.popularBancoInicial()
-
-                _cadastroResult.value = true
+            } finally {
+                _isLoading.value = false
             }
         }
+    }
+}
+
+// ========================================================================
+// FACTORY (Necessária para passar o Repository no construtor)
+// ========================================================================
+
+class AuthViewModelFactory(private val repository: GameRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return AuthViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

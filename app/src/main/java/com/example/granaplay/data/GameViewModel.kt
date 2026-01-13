@@ -6,59 +6,74 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 class GameViewModel(private val repository: GameRepository) : ViewModel() {
 
-    // --- ESTADO DE LOADING ---
-    private val _isLoading = MutableLiveData(true) // Começa carregando
+    // ========================================================================
+    // ESTADOS (State)
+    // ========================================================================
+
+    private val _isLoading = MutableLiveData(true)
     val isLoading: LiveData<Boolean> = _isLoading
 
-    val todosModulos: Flow<List<Modulo>> = repository.todosModulos
     private val _estadoModulos = MutableLiveData<List<ModuloEstado>>()
     val estadoModulos: LiveData<List<ModuloEstado>> = _estadoModulos
 
+    // Variável que guardará o LiveData do usuário após o login/identificação
     var usuarioAtual: LiveData<Usuario>? = null
 
+    // ========================================================================
+    // INICIALIZAÇÃO
+    // ========================================================================
+
     init {
-        // Agora o carregamento é gerenciado aqui
-        prepararApp()
+        inicializarAplicacao()
     }
 
-    private fun prepararApp() {
+    private fun inicializarAplicacao() {
         viewModelScope.launch {
             _isLoading.value = true
 
-            // 1. Popula o banco (Agora seguro contra duplicatas)
+            // Popula o banco com os módulos/lições iniciais se necessário
             repository.verificarEPopularBanco()
 
-            // 2. Pequeno delay visual opcional (500ms) para não piscar muito rápido
-            // delay(500)
-
-            // 3. Libera a tela
             _isLoading.value = false
         }
     }
 
+    // ========================================================================
+    // LÓGICA DO USUÁRIO
+    // ========================================================================
+
     fun carregarDadosUsuario(usuarioId: Long) {
         viewModelScope.launch {
+            // Verifica regras de negócio (recarga de vidas) antes de expor os dados
             repository.verificarRecargaDeVidas(usuarioId)
         }
+
+        // Configura o observável do usuário se ainda não estiver configurado
         if (usuarioAtual == null) {
             usuarioAtual = repository.getUsuarioEmTempoReal(usuarioId).asLiveData()
         }
-        carregarModulos(usuarioId)
+
+        // Inicia o monitoramento do progresso dos módulos para este usuário
+        monitorarProgressoModulos(usuarioId)
     }
 
-    fun carregarModulos(usuarioId: Long) {
+    private fun monitorarProgressoModulos(usuarioId: Long) {
         viewModelScope.launch {
+            // Coleta o Flow do repositório e atualiza o LiveData da UI
             repository.getModulosComEstado(usuarioId).collect { estados ->
                 _estadoModulos.value = estados
             }
         }
     }
+
+    // ========================================================================
+    // NAVEGAÇÃO E CONTEÚDO
+    // ========================================================================
 
     fun getProximaLicao(usuarioId: Long, moduloId: Long, onResult: (Licao?) -> Unit) {
         viewModelScope.launch {
@@ -67,10 +82,15 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
         }
     }
 
+    // Retorna Flow diretamente para ser consumido pela UI ou convertido
     fun getLicoes(moduloId: Long): Flow<List<Licao>> {
         return repository.getLicoesPorModulo(moduloId)
     }
 }
+
+// ========================================================================
+// FACTORY
+// ========================================================================
 
 class GameViewModelFactory(private val repository: GameRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

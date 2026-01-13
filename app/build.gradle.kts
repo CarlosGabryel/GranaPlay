@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("kotlin-kapt")
+    // Plugin moderno do Compose Compiler (Gerencia versões automaticamente)
     alias(libs.plugins.compose.compiler)
 }
 
@@ -17,6 +18,13 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Necessário para o Room exportar schemas (opcional, mas recomendado)
+        kapt {
+            arguments {
+                arg("room.schemaLocation", "$projectDir/schemas")
+            }
+        }
     }
 
     buildTypes {
@@ -28,59 +36,78 @@ android {
             )
         }
     }
+
+    // Atualizado para Java 17 (Padrão moderno para Android/Compose)
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
 
     buildFeatures {
-        compose = true // Habilita o Compose
-        viewBinding = true // Útil para conectar com XML antigo
+        compose = true
+        viewBinding = true // Mantido para compatibilidade com XML (ActivityAuth)
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1" // Verifique a versão compatível com seu Kotlin
-    }
+
+    // O bloco 'composeOptions' foi removido pois o plugin 'compose.compiler'
+    // gerencia a versão nativamente agora.
 }
 
 dependencies {
-
-    implementation ("androidx.room:room-runtime:2.6.1")
-    kapt ("androidx.room:room-compiler:2.6.1")
-    implementation ("androidx.room:room-ktx:2.6.1")
+    // ========================================================================
+    // CORE & UI LEGADO
+    // ========================================================================
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.constraintlayout)
-    implementation(libs.androidx.lifecycle.livedata.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+
+    // ========================================================================
+    // ARQUITETURA & NAVEGAÇÃO
+    // ========================================================================
+    val lifecycleVersion = "2.6.2"
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
+
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
 
-    val lifecycle_version = "2.6.2"
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version")
+    // ========================================================================
+    // BANCO DE DADOS (ROOM)
+    // ========================================================================
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
 
-    // (Opcional) Se precisar de extensões de runtime
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:${lifecycle_version}")
-
-    // Dependências do Compose (BoM garante versões compatíveis)
+    // ========================================================================
+    // JETPACK COMPOSE (UI MODERNA)
+    // ========================================================================
+    // O BOM (Bill of Materials) garante que todas as libs do Compose usem versões compatíveis
     val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3") // Material 3
     implementation("androidx.compose.ui:ui-tooling-preview")
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.compose.material3:material3")
 
-    // Ícones estendidos (necessário para ter todos os ícones da imagem)
+    // Integração do LiveData com Compose
+    implementation("androidx.compose.runtime:runtime-livedata") // Versão gerida pelo BOM
+
+    // Ícones extras (necessário para ícones como Filled.Home, etc.)
     implementation("androidx.compose.material:material-icons-extended")
 
-    implementation("androidx.compose.runtime:runtime-livedata:1.6.0")
+    // Ferramentas de Debug
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // ========================================================================
+    // TESTES
+    // ========================================================================
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }

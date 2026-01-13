@@ -7,28 +7,18 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface GameDao {
-    // --- Usuário ---
-    @Insert
-    suspend fun inserirUsuario(usuario: Usuario): Long
-
-    @Query("SELECT * FROM usuarios WHERE email = :email LIMIT 1")
-    suspend fun getUsuarioPorEmail(email: String): Usuario?
-
-    @Query("UPDATE usuarios SET moedas = :novasMoedas WHERE id = :id")
-    suspend fun atualizarMoedas(id: Long, novasMoedas: Int)
-
-    // Atualizar Vidas (Necessário para a mecânica de erro no Quiz)
-    @Query("UPDATE usuarios SET pontosSaude = :novasVidas WHERE id = :id")
-    suspend fun atualizarVidas(id: Long, novasVidas: Int)
-
     // --- Módulos e Lições ---
+
+    // NOVO: Verifica se existe módulo pelo nome (para evitar duplicata)
+    @Query("SELECT EXISTS(SELECT * FROM modulos WHERE nome = :nome)")
+    suspend fun existeModuloComNome(nome: String): Boolean
+
     @Query("SELECT COUNT(*) FROM modulos")
     suspend fun contarModulos(): Int
 
     @Insert
     suspend fun inserirModulo(modulo: Modulo): Long
 
-    // IMPORTANTE: Alterado para retornar Long (o ID da lição inserida)
     @Insert
     suspend fun inserirLicao(licao: Licao): Long
 
@@ -39,7 +29,6 @@ interface GameDao {
     fun getLicoesDoModulo(moduloId: Long): Flow<List<Licao>>
 
     // --- Quiz (Questões e Alternativas) ---
-    // Métodos novos que estavam faltando e causando o erro
 
     @Insert
     suspend fun inserirQuestao(questao: Questao): Long
@@ -53,26 +42,43 @@ interface GameDao {
     @Query("SELECT * FROM alternativas WHERE questaoId = :questaoId")
     suspend fun getAlternativasDaQuestao(questaoId: Long): List<Alternativa>
 
-    // --- Progresso ---
+    // --- Usuário, Vidas e Progresso ---
+
+    @Insert
+    suspend fun inserirUsuario(usuario: Usuario): Long
+
+    @Query("SELECT * FROM usuarios WHERE email = :email LIMIT 1")
+    suspend fun getUsuarioPorEmail(email: String): Usuario?
+
+    @Query("SELECT * FROM usuarios WHERE id = :id")
+    fun getUsuarioFlow(id: Long): Flow<Usuario>
+
+    @Query("SELECT * FROM usuarios WHERE id = :id LIMIT 1")
+    suspend fun getUsuarioPorIdSemFlow(id: Long): Usuario?
+
+    @Query("UPDATE usuarios SET moedas = :novasMoedas WHERE id = :id")
+    suspend fun atualizarMoedas(id: Long, novasMoedas: Int)
+
+    @Query("UPDATE usuarios SET pontosSaude = :novasVidas WHERE id = :id")
+    suspend fun atualizarVidas(id: Long, novasVidas: Int)
+
+    @Query("UPDATE usuarios SET xp = xp + :quantidade WHERE id = :id")
+    suspend fun adicionarXp(id: Long, quantidade: Int)
+
     @Insert
     suspend fun registrarLicaoConcluida(progresso: UsuarioLicao)
 
     @Query("SELECT EXISTS(SELECT * FROM usuario_licoes WHERE idUsuario = :userId AND idLicao = :licaoId)")
     suspend fun isLicaoConcluida(userId: Long, licaoId: Long): Boolean
 
-    // --- Consultas de Progresso e Lógica de Jogo ---
-
-    // 1. Conta quantas lições existem num módulo (Para saber o total de estrelas possíveis)
     @Query("SELECT COUNT(*) FROM licoes WHERE idModulo = :moduloId")
     suspend fun contarLicoesDoModulo(moduloId: Long): Int
 
-    // 2. Conta quantas lições desse módulo o usuário já terminou (Para pintar as estrelas douradas)
     @Query("SELECT COUNT(*) FROM usuario_licoes " +
             "INNER JOIN licoes ON usuario_licoes.idLicao = licoes.id " +
             "WHERE usuario_licoes.idUsuario = :usuarioId AND licoes.idModulo = :moduloId")
     suspend fun contarLicoesConcluidasNoModulo(usuarioId: Long, moduloId: Long): Int
 
-    // 3. Busca a primeira lição que o usuário AINDA NÃO FEZ (Para o botão "Continuar")
     @Query("SELECT * FROM licoes " +
             "WHERE idModulo = :moduloId AND id NOT IN (" +
             "    SELECT idLicao FROM usuario_licoes WHERE idUsuario = :usuarioId" +

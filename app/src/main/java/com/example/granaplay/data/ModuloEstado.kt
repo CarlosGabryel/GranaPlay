@@ -1,10 +1,17 @@
 package com.example.granaplay.data
 
-// Essa classe não é uma tabela do banco!
-// Ela serve apenas para transportar dados prontos para a tela.
+/**
+ * Modelo de UI (View Object) que agrega a entidade Módulo com o progresso do usuário.
+ * Esta classe não é salva no Banco de Dados.
+ */
 data class ModuloEstado(
-    val modulo: Modulo,       // Os dados do módulo (nome, descrição)
-    val totalLicoes: Int,     // Quantas estrelas cinzas desenhar
-    val licoesConcluidas: Int,// Quantas estrelas pintar de dourado
-    val isBloqueado: Boolean  // Se deve ficar cinza/desabilitado
+    // Dados estáticos do módulo (Título, Descrição, Ordem)
+    val modulo: Modulo,
+
+    // Métricas de progresso
+    val totalLicoes: Int,
+    val licoesConcluidas: Int,
+
+    // Estado de acesso (baseado na conclusão do módulo anterior)
+    val isBloqueado: Boolean
 )

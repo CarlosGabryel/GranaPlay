@@ -7,23 +7,16 @@ import kotlinx.coroutines.withContext
 
 class GameRepository(private val gameDao: GameDao) {
 
-    val todosModulos: Flow<List<Modulo>> = gameDao.getTodosModulos()
+    // ========================================================================
+    // POPULAÇÃO DO BANCO (SEEDING)
+    // ========================================================================
 
-    fun getUsuarioEmTempoReal(id: Long): Flow<Usuario> {
-        return gameDao.getUsuarioFlow(id)
-    }
-
-    // --- POPULAÇÃO À PROVA DE FALHAS (IDEMPOTENTE) ---
     suspend fun verificarEPopularBanco() {
         withContext(Dispatchers.IO) {
             ConteudoInicial.dados.forEach { seedModulo ->
-
-                // SOLUÇÃO DA DUPLICAÇÃO:
-                // Antes de inserir, verifica se JÁ EXISTE um módulo com esse nome exato.
                 val jaExiste = gameDao.existeModuloComNome(seedModulo.titulo)
 
                 if (!jaExiste) {
-                    // Só entra aqui se não existir. Seguro para rodar várias vezes.
                     val moduloId = gameDao.inserirModulo(
                         Modulo(
                             nome = seedModulo.titulo,
@@ -38,7 +31,8 @@ class GameRepository(private val gameDao: GameDao) {
                                 nome = seedLicao.titulo,
                                 descricao = "Vamos aprender!",
                                 pontuacao = 10,
-                                idModulo = moduloId,
+                                // CORREÇÃO AQUI: O nome do parâmetro na classe Licao agora é 'moduloId'
+                                moduloId = moduloId,
                                 ordem = seedLicao.id
                             )
                         )
@@ -60,12 +54,15 @@ class GameRepository(private val gameDao: GameDao) {
                                 } else {
                                     null
                                 }
+
                                 gameDao.inserirAlternativa(
                                     Alternativa(
                                         questaoId = questaoId,
                                         texto = textoOpcao,
                                         isCorreta = (index == seedQuestao.correctIndex),
-                                        imagemRes = imagemNome
+                                        // CORREÇÃO TAMBÉM AQUI: Se você atualizou a classe Alternativa,
+                                        // o campo mudou de 'imagemRes' para 'imagemSource'
+                                        imagemSource = imagemNome
                                     )
                                 )
                             }
@@ -76,56 +73,84 @@ class GameRepository(private val gameDao: GameDao) {
         }
     }
 
-    // --- Demais Métodos (Mantidos iguais) ---
+    // ========================================================================
+    // GESTÃO DE CONTEÚDO (LEITURA)
+    // ========================================================================
 
-    fun getLicoesPorModulo(moduloId: Long): Flow<List<Licao>> = gameDao.getLicoesDoModulo(moduloId)
+    val todosModulos: Flow<List<Modulo>> = gameDao.getTodosModulos()
 
-    suspend fun getQuestoesPorLicao(licaoId: Long): List<Questao> = gameDao.getQuestoesDaLicao(licaoId)
+    fun getLicoesPorModulo(moduloId: Long): Flow<List<Licao>> =
+        gameDao.getLicoesDoModulo(moduloId)
 
-    suspend fun getAlternativasPorQuestao(questaoId: Long): List<Alternativa> = gameDao.getAlternativasDaQuestao(questaoId)
+    suspend fun getQuestoesPorLicao(licaoId: Long): List<Questao> =
+        gameDao.getQuestoesDaLicao(licaoId)
 
-    suspend fun verificarRecargaDeVidas(usuarioId: Long) {
-        val usuario = gameDao.getUsuarioPorIdSemFlow(usuarioId) ?: return
-        if (usuario.pontosSaude >= 5) return
-        val ultimaPerda = usuario.tempoUltimaVidaPerdida
-        if (ultimaPerda != null) {
-            val agora = System.currentTimeMillis()
-            val vinteQuatroHorasEmMs = 24 * 60 * 60 * 1000
-            if (agora - ultimaPerda >= vinteQuatroHorasEmMs) {
-                gameDao.atualizarVidas(usuarioId, 5)
-            }
-        }
-    }
+    suspend fun getAlternativasPorQuestao(questaoId: Long): List<Alternativa> =
+        gameDao.getAlternativasDaQuestao(questaoId)
 
-    suspend fun ganharXp(usuarioId: Long, xpGanho: Int) = gameDao.adicionarXp(usuarioId, xpGanho)
+    // ========================================================================
+    // USUÁRIO E AUTENTICAÇÃO
+    // ========================================================================
 
     suspend fun cadastrarUsuario(usuario: Usuario) = gameDao.inserirUsuario(usuario)
 
     suspend fun buscarUsuarioPorEmail(email: String): Usuario? = gameDao.getUsuarioPorEmail(email)
 
-    suspend fun adicionarMoedas(usuarioId: Long, quantidade: Int) = gameDao.atualizarMoedas(usuarioId, quantidade)
+    fun getUsuarioEmTempoReal(id: Long): Flow<Usuario> = gameDao.getUsuarioFlow(id)
+
+    // ========================================================================
+    // GAMIFICAÇÃO E PROGRESSO
+    // ========================================================================
+
+    suspend fun ganharXp(usuarioId: Long, xpGanho: Int) =
+        gameDao.adicionarXp(usuarioId, xpGanho)
+
+    suspend fun adicionarMoedas(usuarioId: Long, quantidade: Int) {
+        val usuario = gameDao.getUsuarioPorId(usuarioId) ?: return
+        val novoSaldo = usuario.moedas + quantidade
+        gameDao.atualizarMoedas(usuarioId, novoSaldo)
+    }
+
+    suspend fun verificarRecargaDeVidas(usuarioId: Long) {
+        val usuario = gameDao.getUsuarioPorId(usuarioId) ?: return
+
+        if (usuario.pontosSaude >= 5) return
+
+        val ultimaPerda = usuario.tempoUltimaVidaPerdida
+        if (ultimaPerda != null) {
+            val agora = System.currentTimeMillis()
+            val umDiaEmMs = 24 * 60 * 60 * 1000
+
+            if (agora - ultimaPerda >= umDiaEmMs) {
+                gameDao.atualizarVidas(usuarioId, 5)
+            }
+        }
+    }
 
     fun getModulosComEstado(usuarioId: Long): Flow<List<ModuloEstado>> {
         return gameDao.getTodosModulos().map { modulos ->
             val listaEstados = mutableListOf<ModuloEstado>()
             var moduloAnteriorCompleto = true
+
             for (modulo in modulos) {
-                val total = gameDao.contarLicoesDoModulo(modulo.id)
-                val concluidas = gameDao.contarLicoesConcluidasNoModulo(usuarioId, modulo.id)
+                val totalLicoes = gameDao.contarLicoesDoModulo(modulo.id)
+                val licoesConcluidas = gameDao.contarLicoesConcluidasNoModulo(usuarioId, modulo.id)
                 val estaBloqueado = !moduloAnteriorCompleto
+
                 listaEstados.add(
                     ModuloEstado(
                         modulo = modulo,
-                        totalLicoes = total,
-                        licoesConcluidas = concluidas,
+                        totalLicoes = totalLicoes,
+                        licoesConcluidas = licoesConcluidas,
                         isBloqueado = estaBloqueado
                     )
                 )
-                moduloAnteriorCompleto = (concluidas == total && total > 0)
+                moduloAnteriorCompleto = (licoesConcluidas == totalLicoes && totalLicoes > 0)
             }
             listaEstados
         }
     }
 
-    suspend fun getProximaLicao(usuarioId: Long, moduloId: Long): Licao? = gameDao.getProximaLicaoPendente(usuarioId, moduloId)
+    suspend fun getProximaLicao(usuarioId: Long, moduloId: Long): Licao? =
+        gameDao.getProximaLicaoPendente(usuarioId, moduloId)
 }

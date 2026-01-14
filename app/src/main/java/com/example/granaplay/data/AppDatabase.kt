@@ -6,11 +6,19 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Usuario::class, Modulo::class, Licao::class, UsuarioLicao::class, Questao::class, Alternativa::class],
+    entities = [
+        Usuario::class,
+        Modulo::class,
+        Licao::class,
+        UsuarioLicao::class,
+        Questao::class,
+        Alternativa::class
+    ],
     version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
+
     abstract fun gameDao(): GameDao
 
     companion object {
@@ -24,8 +32,9 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "granaplay_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration() // Limpa o banco ao alterar versão (útil em dev)
                     .build()
+
                 INSTANCE = instance
                 instance
             }

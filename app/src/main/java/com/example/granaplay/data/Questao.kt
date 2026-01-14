@@ -1,7 +1,9 @@
 package com.example.granaplay.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
@@ -10,16 +12,28 @@ import androidx.room.PrimaryKey
         ForeignKey(
             entity = Licao::class,
             parentColumns = ["id"],
-            childColumns = ["licaoId"],
+            childColumns = ["licao_id"],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    // Otimização essencial para evitar Full Table Scan ao buscar questões de uma lição
+    indices = [Index(value = ["licao_id"])]
 )
 data class Questao(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val licaoId: Long,          // Vincula a questão à Lição
-    val enunciado: String,      // O texto da pergunta [cite: 116]
-    val feedbackAcerto: String, // Mensagem de "Parabéns" [cite: 120]
-    val feedbackErro: String,    // Mensagem explicativa do erro [cite: 126]
-    val tipo: String = "TEXT_2" // Novo campo: "TEXT_2" ou "IMAGE_4"
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    @ColumnInfo(name = "licao_id")
+    val licaoId: Long,
+
+    val enunciado: String,
+
+    @ColumnInfo(name = "feedback_acerto")
+    val feedbackAcerto: String,
+
+    @ColumnInfo(name = "feedback_erro")
+    val feedbackErro: String,
+
+    // Define o layout da questão (Ex: "TEXT_2" ou "IMAGE_4")
+    val tipo: String = "TEXT_2"
 )

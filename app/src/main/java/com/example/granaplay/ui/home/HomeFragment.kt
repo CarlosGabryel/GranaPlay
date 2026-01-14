@@ -8,23 +8,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -41,6 +25,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +42,7 @@ import com.example.granaplay.data.GameViewModelFactory
 import com.example.granaplay.data.ModuloEstado
 import com.example.granaplay.ui.theme.Baloo2FontFamily
 import com.example.granaplay.ui.theme.BalooFontFamily
+import kotlin.math.min
 
 class HomeFragment : Fragment() {
 
@@ -76,29 +62,44 @@ class HomeFragment : Fragment() {
         viewModel.carregarDadosUsuario(userId)
 
         return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                val backgroundColor = Color(0xFFDFF3FF)
-                // Observa o estado de Loading
                 val isLoading by viewModel.isLoading.observeAsState(true)
 
-                // Lógica de Troca de Telas
                 if (isLoading) {
-                    LoadingScreen(backgroundColor)
+                    LoadingScreen()
                 } else {
-                    GameScreen(viewModel, backgroundColor)
+                    GameScreen(viewModel)
                 }
             }
         }
     }
 }
 
-// --- TELA DE LOADING ---
+// ========================================================================
+// ESTILOS E CORES
+// ========================================================================
+
+private object HomeStyles {
+    val BackgroundColor = Color(0xFFDFF3FF)
+    val BlueBanner = Color(0xFF258EB6)
+    val DarkBlueBanner = Color(0xFF136F91)
+    val TextModuloColor = Color(0xFF2C8CAE)
+    val TextLockedColor = Color(0xFF8FAAB6)
+    val PillColor = Color(0xFF5FA8D3)
+    val LoadingText = Color(0xFF136F91)
+}
+
+// ========================================================================
+// TELAS PRINCIPAIS
+// ========================================================================
+
 @Composable
-fun LoadingScreen(backgroundColor: Color) {
+fun LoadingScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor),
+            .background(HomeStyles.BackgroundColor),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -109,7 +110,7 @@ fun LoadingScreen(backgroundColor: Color) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             CircularProgressIndicator(
-                color = Color(0xFF258EB6),
+                color = HomeStyles.BlueBanner,
                 strokeWidth = 6.dp
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -117,116 +118,128 @@ fun LoadingScreen(backgroundColor: Color) {
                 text = "Preparando o Jogo...",
                 fontFamily = BalooFontFamily,
                 fontSize = 20.sp,
-                color = Color(0xFF136F91)
+                color = HomeStyles.LoadingText
             )
         }
     }
 }
 
-// --- TELA DO JOGO ---
 @Composable
-fun GameScreen(viewModel: GameViewModel, backgroundColor: Color) {
+fun GameScreen(viewModel: GameViewModel) {
     val usuario by viewModel.usuarioAtual?.observeAsState() ?: androidx.compose.runtime.mutableStateOf(null)
     val modulos by viewModel.estadoModulos.observeAsState(emptyList())
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundColor)
+            .background(HomeStyles.BackgroundColor)
             .statusBarsPadding()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 80.dp)
+                .padding(bottom = 80.dp) // Espaço para BottomNav
         ) {
-            GameTopBar(
+            // 1. HUD (Topo)
+            GameHUD(
                 moedas = usuario?.moedas ?: 0,
                 vidas = usuario?.pontosSaude ?: 5,
                 xp = usuario?.xp ?: 0
             )
 
-            WorldBanner()
-
-            Box(
+            // 2. Mapa (Centro/Fundo)
+            // Usa weight(1f) para ocupar todo o espaço restante disponível
+            GameMapArea(
+                modulos = modulos,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-            ) {
-                // Fundo (Estrada)
-                Image(
-                    painter = painterResource(id = R.drawable.path),
-                    contentDescription = null,
-                    contentScale = ContentScale.FillBounds,
-                    modifier = Modifier
-                        .fillMaxWidth(0.75f)
-                        .fillMaxHeight(0.85f)
-                        .align(Alignment.Center)
-                )
-
-                // Robô
-                Image(
-                    painter = painterResource(id = R.drawable.ic_robot_body),
-                    contentDescription = "Robô",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .height(160.dp)
-                        .padding(start = 22.dp)
-                        .align(Alignment.TopStart)
-                        .offset(y = (-53).dp)
-                )
-
-                // Lista de Módulos
-                modulos.forEachIndexed { index, moduloEstado ->
-                    val isLeftAligned = (index % 2 != 0)
-                    val topOffset = 30.dp + (index * 120).dp
-                    val alignModifier = if (isLeftAligned) Alignment.TopStart else Alignment.TopEnd
-                    val paddingModifier = if (isLeftAligned)
-                        Modifier.padding(top = topOffset, start = 18.dp)
-                    else
-                        Modifier.padding(top = topOffset, end = 18.dp)
-
-                    Box(
-                        modifier = Modifier
-                            .align(alignModifier)
-                            .then(paddingModifier)
-                    ) {
-                        LevelItem(
-                            moduloEstado = moduloEstado,
-                            isLeftAligned = isLeftAligned,
-                            onClick = {
-                                if (!moduloEstado.isBloqueado) {
-                                    // TODO: Navegar para as lições
-                                }
-                            }
-                        )
-                    }
-                }
-
-                // Seta Final
-                val lastModuleY = 30 + (modulos.size * 120)
-                val finalY = if (modulos.isNotEmpty()) lastModuleY.dp else 400.dp
-
-                Image(
-                    painter = painterResource(id = R.drawable.ic_world_ending),
-                    contentDescription = "Próximo Mundo",
-                    modifier = Modifier
-                        .size(150.dp)
-                        .align(Alignment.TopEnd)
-                        .offset(y = finalY - 50.dp, x = 18.dp)
-                )
-            }
+            )
         }
     }
 }
 
-// --- CORES ---
-val BlueBanner = Color(0xFF258EB6)
-val DarkBlueBanner = Color(0xFF136F91)
-val TextModuloColor = Color(0xFF2C8CAE)
-val TextLockedColor = Color(0xFF8FAAB6)
+// ========================================================================
+// MAPA E POSICIONAMENTO
+// ========================================================================
 
-// --- COMPONENTES UI ---
+@Composable
+fun GameMapArea(
+    modulos: List<ModuloEstado>,
+    modifier: Modifier = Modifier
+) {
+    // IMPORTANTE: Mantivemos Box (sem Scroll) para respeitar o layout fixo original
+    Box(modifier = modifier) {
+
+        // A. Fundo (Estrada)
+        Image(
+            painter = painterResource(id = R.drawable.path),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .fillMaxWidth(0.75f)
+                .fillMaxHeight(0.85f)
+                .align(Alignment.Center)
+        )
+
+        // B. Avatar (Robô)
+        Image(
+            painter = painterResource(id = R.drawable.ic_robot_body),
+            contentDescription = "Avatar",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .height(160.dp)
+                .padding(start = 22.dp)
+                .align(Alignment.TopStart)
+                .offset(y = (-53).dp)
+        )
+
+        // C. Módulos (Posicionamento Absoluto via Padding)
+        modulos.forEachIndexed { index, moduloEstado ->
+            val isLeftAligned = (index % 2 != 0)
+
+            // Lógica original de cálculo de posição Y
+            val topOffset = 30.dp + (index * 120).dp
+
+            val alignModifier = if (isLeftAligned) Alignment.TopStart else Alignment.TopEnd
+
+            val paddingModifier = if (isLeftAligned)
+                Modifier.padding(top = topOffset, start = 18.dp)
+            else
+                Modifier.padding(top = topOffset, end = 18.dp)
+
+            Box(
+                modifier = Modifier
+                    .align(alignModifier)
+                    .then(paddingModifier)
+            ) {
+                LevelItem(
+                    moduloEstado = moduloEstado,
+                    isLeftAligned = isLeftAligned,
+                    onClick = {
+                        if (!moduloEstado.isBloqueado) {
+                            // TODO: Navegar
+                        }
+                    }
+                )
+            }
+        }
+
+        // D. Seta Final (Próximo Mundo)
+        // Posicionamento também calculado manualmente baseado na quantidade de módulos
+        val lastModuleY = 30 + (modulos.size * 120)
+        val finalY = if (modulos.isNotEmpty()) lastModuleY.dp else 400.dp
+
+        Image(
+            painter = painterResource(id = R.drawable.ic_world_ending),
+            contentDescription = "Próximo Mundo",
+            modifier = Modifier
+                .size(150.dp)
+                .align(Alignment.TopEnd)
+                .offset(y = finalY - 50.dp, x = 18.dp)
+        )
+    }
+}
 
 @Composable
 fun LevelItem(
@@ -234,35 +247,30 @@ fun LevelItem(
     isLeftAligned: Boolean,
     onClick: () -> Unit
 ) {
-    val alignment = if (isLeftAligned) Arrangement.Start else Arrangement.End
-    val gapSize = 0.dp
+    val rowArrangement = if (isLeftAligned) Arrangement.Start else Arrangement.End
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = alignment,
+        horizontalArrangement = rowArrangement,
         modifier = Modifier
-            .fillMaxWidth(1f)
+            .fillMaxWidth(1f) // Ocupa largura total para permitir alinhamento correto
             .clickable(enabled = !moduloEstado.isBloqueado) { onClick() }
     ) {
         if (isLeftAligned) {
             HexagonGroup(moduloEstado)
-            Spacer(modifier = Modifier.width(gapSize))
-            TextGroup(
-                moduloEstado = moduloEstado,
-                isLeftAligned = true,
-                modifier = Modifier.weight(1f)
-            )
+            Spacer(modifier = Modifier.width(0.dp))
+            TextGroup(moduloEstado, isLeftAligned = true, modifier = Modifier.weight(1f))
         } else {
-            TextGroup(
-                moduloEstado = moduloEstado,
-                isLeftAligned = false,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(gapSize))
+            TextGroup(moduloEstado, isLeftAligned = false, modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(0.dp))
             HexagonGroup(moduloEstado)
         }
     }
 }
+
+// ========================================================================
+// COMPONENTES VISUAIS (Hexágono, Texto, Estrelas)
+// ========================================================================
 
 @Composable
 fun HexagonGroup(moduloEstado: ModuloEstado) {
@@ -275,14 +283,12 @@ fun HexagonGroup(moduloEstado: ModuloEstado) {
         else -> null
     }
 
-    // --- MUDANÇA AQUI: Seleção Hardcoded da Imagem ---
-    // Certifique-se de ter as imagens: img_level_1, img_level_2, img_level_3, img_level_4 na pasta drawable
     val levelImageRes = when (moduloEstado.modulo.ordem) {
         1 -> R.drawable.ic_modulo1
         2 -> R.drawable.ic_modulo2
         3 -> R.drawable.ic_modulo3
         4 -> R.drawable.ic_modulo4
-        else -> R.drawable.ic_modulo1 // Padrão se não encontrar
+        else -> R.drawable.ic_modulo1
     }
 
     Box(
@@ -292,8 +298,8 @@ fun HexagonGroup(moduloEstado: ModuloEstado) {
             .offset(y = 20.dp)
     ) {
         Image(
-            painter = painterResource(id = levelImageRes), // Usando a variável dinâmica
-            contentDescription = "Nível",
+            painter = painterResource(id = levelImageRes),
+            contentDescription = null,
             colorFilter = colorFilter,
             modifier = Modifier
                 .requiredSize(128.dp)
@@ -304,81 +310,27 @@ fun HexagonGroup(moduloEstado: ModuloEstado) {
     }
 }
 
-// --- ATUALIZAÇÃO DA LÓGICA DE POSIÇÃO DAS ESTRELAS ---
 @Composable
 fun BoxScope.StarsLayout(total: Int, concluidas: Int) {
-
-    // Define posições baseadas na quantidade TOTAL de estrelas para manter simetria
     val posicoes = when (total) {
-        1 -> listOf(
-            Pair(0, -68) // Centralizada no topo
-        )
-        2 -> listOf(
-            Pair(-22, -62), // Esquerda, perto do topo
-            Pair(22, -62)   // Direita, perto do topo
-        )
-        3 -> listOf(
-            Pair(-40, -50), // Esquerda mais baixa
-            Pair(0, -70),   // Centro topo (pico)
-            Pair(40, -50)   // Direita mais baixa
-        )
-        else -> listOf( // 4 ou mais (Layout Original Mantido)
-            Pair(-48, -42),
-            Pair(-18, -66),
-            Pair(18, -66),
-            Pair(48, -42)
-        )
+        1 -> listOf(Pair(0, -68))
+        2 -> listOf(Pair(-22, -62), Pair(22, -62))
+        3 -> listOf(Pair(-40, -50), Pair(0, -70), Pair(40, -50))
+        else -> listOf(Pair(-48, -42), Pair(-18, -66), Pair(18, -66), Pair(48, -42))
     }
 
-    // Garante que não tentamos desenhar mais estrelas do que posições definidas (segurança)
     val qtdParaMostrar = minOf(total, posicoes.size)
 
     for (i in 0 until qtdParaMostrar) {
-        val numeroEstrela = (i + 1).toString()
         val isGold = i < concluidas
         val (x, y) = posicoes[i]
 
         StarImage(
-            number = numeroEstrela,
+            number = (i + 1).toString(),
             isGold = isGold,
             modifier = Modifier
                 .align(Alignment.Center)
                 .offset(x = x.dp, y = y.dp)
-        )
-    }
-}
-
-@Composable
-fun TextGroup(moduloEstado: ModuloEstado, isLeftAligned: Boolean, modifier: Modifier = Modifier) {
-    val textAlign = if (isLeftAligned) TextAlign.Start else TextAlign.End
-    val alignment = if (isLeftAligned) Alignment.Start else Alignment.End
-
-    // Uso correto da cor TextLockedColor
-    val tituloColor = if (moduloEstado.isBloqueado) TextLockedColor else BlueBanner
-    val descColor = if (moduloEstado.isBloqueado) TextLockedColor else TextModuloColor
-
-    Column(
-        horizontalAlignment = alignment,
-        modifier = modifier.padding(top = 55.dp)
-    ) {
-        Text(
-            text = moduloEstado.modulo.nome,
-            color = tituloColor,
-            fontFamily = BalooFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            textAlign = textAlign,
-            lineHeight = 22.sp
-        )
-        Text(
-            text = moduloEstado.modulo.descricao,
-            modifier = Modifier.offset(y = (-10).dp),
-            color = descColor,
-            fontFamily = Baloo2FontFamily,
-            fontWeight = FontWeight.Normal,
-            fontSize = 16.sp,
-            textAlign = textAlign,
-            lineHeight = 16.sp
         )
     }
 }
@@ -409,32 +361,71 @@ fun StarImage(number: String, isGold: Boolean, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun GameTopBar(moedas: Int, vidas: Int, xp: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+fun TextGroup(moduloEstado: ModuloEstado, isLeftAligned: Boolean, modifier: Modifier = Modifier) {
+    val textAlign = if (isLeftAligned) TextAlign.Start else TextAlign.End
+    val alignment = if (isLeftAligned) Alignment.Start else Alignment.End
+
+    val tituloColor = if (moduloEstado.isBloqueado) HomeStyles.TextLockedColor else HomeStyles.BlueBanner
+    val descColor = if (moduloEstado.isBloqueado) HomeStyles.TextLockedColor else HomeStyles.TextModuloColor
+
+    Column(
+        horizontalAlignment = alignment,
+        modifier = modifier.padding(top = 55.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusPill(
-                icon = painterResource(id = R.drawable.ic_robot_face),
-                value = xp.toString(),
-                pillColor = Color(0xFF5FA8D3),
-                iconSize = 52.dp,
-                textPaddingStart = 44.dp,
-                iconOffsetY = (-6).dp
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            StatusPill(
-                icon = painterResource(id = R.drawable.ic_coin),
-                value = moedas.toString(),
-                pillColor = Color(0xFF5FA8D3),
-                textPaddingStart = 40.dp
-            )
+        Text(
+            text = moduloEstado.modulo.nome,
+            color = tituloColor,
+            fontFamily = BalooFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            textAlign = textAlign,
+            lineHeight = 22.sp
+        )
+        Text(
+            text = moduloEstado.modulo.descricao,
+            modifier = Modifier.offset(y = (-10).dp),
+            color = descColor,
+            fontFamily = Baloo2FontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 16.sp,
+            textAlign = textAlign,
+            lineHeight = 16.sp
+        )
+    }
+}
+
+// ========================================================================
+// HUD E BANNER
+// ========================================================================
+
+@Composable
+fun GameHUD(moedas: Int, vidas: Int, xp: Int) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusPill(
+                    icon = painterResource(id = R.drawable.ic_robot_face),
+                    value = xp.toString(),
+                    iconSize = 52.dp,
+                    textPaddingStart = 44.dp,
+                    iconOffsetY = (-6).dp
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                StatusPill(
+                    icon = painterResource(id = R.drawable.ic_coin),
+                    value = moedas.toString(),
+                    textPaddingStart = 40.dp
+                )
+            }
+            HeartDisplay(lives = vidas)
         }
-        HeartDisplay(lives = vidas)
+        WorldBanner()
     }
 }
 
@@ -446,8 +437,10 @@ fun HeartDisplay(lives: Int) {
             val heartIcon = if (isRed) R.drawable.ic_heart else R.drawable.ic_heart_grey
             Image(
                 painter = painterResource(id = heartIcon),
-                contentDescription = "Vida",
-                modifier = Modifier.size(24.dp).padding(2.dp),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .padding(2.dp),
                 contentScale = ContentScale.Fit
             )
         }
@@ -455,10 +448,15 @@ fun HeartDisplay(lives: Int) {
 }
 
 @Composable
-fun StatusPill(icon: Painter, value: String, pillColor: Color, textPaddingStart: Dp, iconOffsetY: Dp = 0.dp, iconSize: Dp = 48.dp) {
+fun StatusPill(icon: Painter, value: String, textPaddingStart: Dp, iconOffsetY: Dp = 0.dp, iconSize: Dp = 48.dp) {
     Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.height(iconSize)) {
         Box(
-            modifier = Modifier.padding(start = 10.dp).height(34.dp).clip(RoundedCornerShape(50)).background(pillColor).padding(start = textPaddingStart, end = 14.dp),
+            modifier = Modifier
+                .padding(start = 10.dp)
+                .height(34.dp)
+                .clip(RoundedCornerShape(50))
+                .background(HomeStyles.PillColor)
+                .padding(start = textPaddingStart, end = 14.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             Text(text = value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp, fontFamily = BalooFontFamily)
@@ -470,15 +468,15 @@ fun StatusPill(icon: Painter, value: String, pillColor: Color, textPaddingStart:
 @Composable
 fun WorldBanner() {
     Column(modifier = Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, bottom = 8.dp)) {
-        Box(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(RoundedCornerShape(16.dp)).background(DarkBlueBanner).padding(bottom = 6.dp)) {
-            Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(BlueBanner).padding(vertical = 16.dp, horizontal = 20.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(RoundedCornerShape(16.dp)).background(HomeStyles.DarkBlueBanner).padding(bottom = 6.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(HomeStyles.BlueBanner).padding(vertical = 16.dp, horizontal = 20.dp)) {
                 Column {
                     Text(text = "MUNDO 1", color = Color.White.copy(alpha = 0.7f), fontFamily = BalooFontFamily, fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 1.sp)
                     Text(text = "Explorando o Valor do Dinheiro", color = Color.White, fontFamily = BalooFontFamily, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 24.sp)
                 }
             }
         }
-        BubbleTail(color = BlueBanner, modifier = Modifier.padding(start = 95.dp).offset(y = (-9).dp))
+        BubbleTail(color = HomeStyles.BlueBanner, modifier = Modifier.padding(start = 95.dp).offset(y = (-9).dp))
     }
 }
 

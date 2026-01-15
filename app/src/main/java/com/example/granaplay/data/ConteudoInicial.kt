@@ -46,7 +46,7 @@ object ConteudoInicial {
                             "Toque na imagem que mostra uma MOEDA de verdade:",
                             listOf("Moeda de 1 Real", "Botão de camisa", "Tampinha de garrafa", "Pedra redonda"),
                             0,
-                            listOf("img_moeda_real", "img_botao", "img_tampinha", "img_pedra")
+                            listOf("ic_one_coin", "ic_button", "ic_bottle_cap", "ic_rock")
                         ),
                         SeedQuestao(
                             "TEXT_2",

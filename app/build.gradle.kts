@@ -94,6 +94,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.8.2")
 
     // Integração do LiveData com Compose
     implementation("androidx.compose.runtime:runtime-livedata") // Versão gerida pelo BOM

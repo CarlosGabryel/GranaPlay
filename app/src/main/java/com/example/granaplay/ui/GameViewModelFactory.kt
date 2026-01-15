@@ -4,28 +4,29 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.granaplay.data.GameRepository
 import com.example.granaplay.data.GameViewModel
+import com.example.granaplay.ui.lesson.LessonViewModel
 
-/**
- * Factory compartilhada para criar ViewModels que dependem do GameRepository.
- * Isso evita ter que criar uma Factory separada para cada tela.
- */
 class GameViewModelFactory(private val repository: GameRepository) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
 
-        // CASO 1: GameViewModel (Usado na MainActivity / HomeFragment)
+        // 1. GameViewModel
         if (modelClass.isAssignableFrom(GameViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return GameViewModel(repository) as T
         }
 
-        // CASO 2: AuthViewModel (Usado na AuthActivity)
+        // 2. AuthViewModel
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return AuthViewModel(repository) as T
         }
 
-        // Adicione outros ViewModels aqui com 'if' se necessário...
+        // 3. NOVO: LessonViewModel
+        if (modelClass.isAssignableFrom(LessonViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return LessonViewModel(repository) as T
+        }
 
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }

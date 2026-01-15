@@ -1,24 +1,52 @@
 package com.example.granaplay.ui
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import com.example.granaplay.GranaPlayApplication
 import com.example.granaplay.MainActivity
-import com.example.granaplay.data.GameRepository
-import com.example.granaplay.databinding.ActivityAuthBinding
+import com.example.granaplay.R
+import com.example.granaplay.data.SessionManager
+import com.example.granaplay.ui.theme.Baloo2FontFamily
+import com.example.granaplay.ui.theme.BalooFontFamily
 
-class AuthActivity : AppCompatActivity() {
+class AuthActivity : ComponentActivity() {
 
-    private lateinit var binding: ActivityAuthBinding
-
-    // Inicializa o ViewModel usando a Factory correta
     private val viewModel: AuthViewModel by viewModels {
         AuthViewModelFactory((application as GranaPlayApplication).repository)
     }
@@ -26,116 +54,233 @@ class AuthActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        binding = ActivityAuthBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        // Verifica se deve abrir em Login ou Cadastro
+        viewModel.verificarEstadoInicial()
 
-        setupEdgeToEdge() // Visual moderno (igual à MainActivity)
-        setupListeners()
-        setupObservers()
-    }
-
-    // ========================================================================
-    // CONFIGURAÇÃO DE UI E SISTEMA
-    // ========================================================================
-
-    private fun setupEdgeToEdge() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.TRANSPARENT
-        // Ícones escuros na barra de status (pois o fundo da tela de login geralmente é claro)
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
-    }
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
 
-    // ========================================================================
-    // LISTENERS (BOTÕES)
-    // ========================================================================
+        setContent {
+            AuthScreen(viewModel = viewModel, onSuccess = { userId ->
+                // Salva a sessão
+                SessionManager(this).criarSessao(userId)
 
-    private fun setupListeners() {
-        binding.btnLogin.setOnClickListener {
-            handleLogin()
-        }
-
-        binding.btnCadastrar.setOnClickListener {
-            handleCadastro()
+                val intent = Intent(this, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+            })
         }
     }
+}
 
-    private fun handleLogin() {
-        val email = binding.etEmail.text.toString()
-        val senha = binding.etSenha.text.toString()
+// CORES
+private object AuthColors {
+    val Background = Color(0xFFBCE6FA)
+    val InputBackground = Color(0xFFE1F5FE)
+    val InputLabel = Color(0xFF2C8CAE)
+    val InputText = Color(0xFF134E63)
+    val Title = Color(0xFF134E63)
+    val Subtitle = Color(0xFF2C8CAE)
+    val BtnMain = Color(0xFF2B89A8)
+    val BtnShadow = Color(0xFF1A5F75)
+    val BtnBorder = Color(0xFF1A5F75)
+}
 
-        if (validarCampos(email, senha)) {
-            viewModel.login(email, senha)
-        } else {
-            exibirMensagem("Preencha email e senha")
+@Composable
+fun AuthScreen(viewModel: AuthViewModel, onSuccess: (Long) -> Unit) {
+    val isLoginMode by viewModel.isLoginMode.observeAsState(true)
+    val isLoading by viewModel.isLoading.observeAsState(false)
+    val errorMessage by viewModel.errorMessage.observeAsState(null)
+
+    val loginResult by viewModel.loginResult.observeAsState(null)
+    val cadastroSucesso by viewModel.cadastroSucesso.observeAsState(false)
+
+    val context = LocalContext.current
+
+    // Observer de Login Sucesso
+    LaunchedEffect(loginResult) {
+        loginResult?.let { userId -> onSuccess(userId) }
+    }
+
+    // Observer de Cadastro Sucesso
+    LaunchedEffect(cadastroSucesso) {
+        if (cadastroSucesso) {
+            Toast.makeText(context, "Cadastro realizado! Faça login.", Toast.LENGTH_SHORT).show()
+            viewModel.irParaLogin() // Manda para tela de login conforme pedido
         }
     }
 
-    private fun handleCadastro() {
-        val nome = binding.etNome.text.toString()
-        val email = binding.etEmail.text.toString()
-        val senha = binding.etSenha.text.toString()
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    }
 
-        if (validarCampos(nome, email, senha)) {
-            viewModel.cadastrar(nome, email, senha)
-        } else {
-            exibirMensagem("Preencha todos os campos para cadastrar")
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AuthColors.Background)
+            .statusBarsPadding()
+            .imePadding()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // LOGO
+            Image(
+                painter = painterResource(id = R.drawable.ic_logo_auth), // Robô com moedas
+                contentDescription = "Logo",
+                modifier = Modifier.size(200.dp),
+                contentScale = ContentScale.Fit
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // TÍTULOS
+            Text(
+                text = if (isLoginMode) "Log in" else "Cadastro",
+                fontFamily = BalooFontFamily,
+                fontWeight = FontWeight.Black,
+                fontSize = 32.sp,
+                color = AuthColors.Title,
+                modifier = Modifier.align(Alignment.Start)
+            )
+            Text(
+                text = if (isLoginMode) "Faça login para continuar" else "Por favor, preencha os campos abaixo",
+                fontFamily = Baloo2FontFamily,
+                fontSize = 18.sp,
+                color = AuthColors.Subtitle,
+                modifier = Modifier.align(Alignment.Start)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // FORMULÁRIO
+            if (isLoginMode) {
+                LoginForm(viewModel, isLoading)
+            } else {
+                RegisterForm(viewModel, isLoading)
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // RODAPÉ
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = if (isLoginMode) "Anda não tem conta? " else "Já tem uma conta? ",
+                    fontFamily = Baloo2FontFamily,
+                    color = AuthColors.Subtitle,
+                    fontSize = 16.sp
+                )
+                Text(
+                    text = if (isLoginMode) "Cadastre-se" else "Faça Log in",
+                    fontFamily = BalooFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    color = AuthColors.Title,
+                    fontSize = 16.sp,
+                    modifier = Modifier.clickable { viewModel.toggleMode() }
+                )
+            }
+            Spacer(modifier = Modifier.height(40.dp))
+        }
+
+        if (isLoading) {
+            CircularProgressIndicator(color = AuthColors.BtnMain, modifier = Modifier.align(Alignment.Center))
         }
     }
+}
 
-    /**
-     * Valida se uma lista de strings não está vazia.
-     * Retorna true se todos os campos tiverem texto.
-     */
-    private fun validarCampos(vararg campos: String): Boolean {
-        return campos.all { it.isNotBlank() }
+@Composable
+fun LoginForm(viewModel: AuthViewModel, isLoading: Boolean) {
+    var email by remember { mutableStateOf("") }
+    var senha by remember { mutableStateOf("") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // TROCADO "USUÁRIO" POR "E-MAIL" CONFORME SOLICITADO (INTERPRETAÇÃO LÓGICA)
+        AuthInput(label = "E-MAIL:", value = email, onValueChange = { email = it }, keyboardType = KeyboardType.Email)
+        AuthInput(label = "SENHA:", value = senha, onValueChange = { senha = it }, isPassword = true)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        AuthButton3D(text = "ENTRAR", onClick = { viewModel.login(email, senha) }, enabled = !isLoading)
     }
+}
 
-    // ========================================================================
-    // OBSERVERS (RESPOSTAS DO VIEWMODEL)
-    // ========================================================================
+@Composable
+fun RegisterForm(viewModel: AuthViewModel, isLoading: Boolean) {
+    var nome by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var senha by remember { mutableStateOf("") }
+    var confirmarSenha by remember { mutableStateOf("") }
 
-    private fun setupObservers() {
-        // Sucesso no Login -> Vai para o Jogo
-        viewModel.loginResult.observe(this) { sucesso ->
-            if (sucesso) {
-                irParaMainActivity()
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        AuthInput(label = "NOME DE USUÁRIO:", value = nome, onValueChange = { nome = it })
+        AuthInput(label = "E-MAIL:", value = email, onValueChange = { email = it }, keyboardType = KeyboardType.Email)
+        AuthInput(label = "SENHA:", value = senha, onValueChange = { senha = it }, isPassword = true)
+        AuthInput(label = "CONFIRMAR SENHA:", value = confirmarSenha, onValueChange = { confirmarSenha = it }, isPassword = true)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        AuthButton3D(text = "CADASTRAR", onClick = { viewModel.cadastrar(nome, email, senha, confirmarSenha) }, enabled = !isLoading)
+    }
+}
+
+// COMPONENTES (INPUT E BOTÃO) MANTIDOS IGUAIS AO DESIGN
+@Composable
+fun AuthInput(label: String, value: String, onValueChange: (String) -> Unit, isPassword: Boolean = false, keyboardType: KeyboardType = KeyboardType.Text) {
+    var passwordVisible by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(AuthColors.InputBackground)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(text = label, color = AuthColors.InputLabel, fontFamily = BalooFontFamily, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                textStyle = TextStyle(color = AuthColors.InputText, fontFamily = BalooFontFamily, fontWeight = FontWeight.Medium, fontSize = 18.sp),
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            if (isPassword) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_eye_open), // Precisa ter esse ícone
+                    contentDescription = "Toggle Password",
+                    tint = AuthColors.InputLabel,
+                    modifier = Modifier.size(24.dp).clickable { passwordVisible = !passwordVisible }
+                )
             }
         }
+    }
+}
 
-        // Sucesso no Cadastro -> Feedback visual
-        viewModel.cadastroResult.observe(this) { sucesso ->
-            if (sucesso) {
-                exibirMensagem("Cadastro realizado! Faça login.")
-                limparCamposCadastro()
-            }
+@Composable
+fun AuthButton3D(text: String, onClick: () -> Unit, enabled: Boolean = true, height: Dp = 60.dp) {
+    val cornerRadius = 12.dp
+    val shadowHeight = 5.dp
+    val mainColor = AuthColors.BtnMain
+    val shadowColor = AuthColors.BtnShadow
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val verticalOffset = if (isPressed && enabled) shadowHeight / 2 else 0.dp
+
+    Box(modifier = Modifier.fillMaxWidth().height(height).clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)) {
+        Box(modifier = Modifier.fillMaxSize().padding(top = verticalOffset).clip(RoundedCornerShape(cornerRadius)).background(shadowColor))
+        Box(modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(bottom = shadowHeight - verticalOffset).border(2.dp, AuthColors.BtnBorder, RoundedCornerShape(cornerRadius)).clip(RoundedCornerShape(cornerRadius)).background(mainColor), contentAlignment = Alignment.Center) {
+            Text(text = text, fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.White, fontFamily = BalooFontFamily, textAlign = TextAlign.Center, letterSpacing = 1.sp)
         }
-
-        // Erros -> Toast
-        viewModel.errorMessage.observe(this) { erro ->
-            erro?.let { exibirMensagem(it) }
-        }
-    }
-
-    // ========================================================================
-    // NAVEGAÇÃO E UTILITÁRIOS
-    // ========================================================================
-
-    private fun irParaMainActivity() {
-        val intent = Intent(this, MainActivity::class.java)
-        // Limpa a pilha para que o usuário não volte ao login ao apertar "Voltar"
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-
-    private fun limparCamposCadastro() {
-        binding.etNome.text.clear()
-        // Opcional: limpar senha também
-        binding.etSenha.text.clear()
-    }
-
-    private fun exibirMensagem(mensagem: String) {
-        Toast.makeText(this, mensagem, Toast.LENGTH_SHORT).show()
     }
 }

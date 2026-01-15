@@ -11,96 +11,100 @@ import kotlinx.coroutines.launch
 
 class AuthViewModel(private val repository: GameRepository) : ViewModel() {
 
-    // ========================================================================
-    // ESTADOS (LIVE DATA)
-    // ========================================================================
-
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
 
-    private val _loginResult = MutableLiveData<Boolean>()
-    val loginResult: LiveData<Boolean> = _loginResult
+    private val _loginResult = MutableLiveData<Long?>() // Retorna o ID se sucesso
+    val loginResult: LiveData<Long?> = _loginResult
 
-    private val _cadastroResult = MutableLiveData<Boolean>()
-    val cadastroResult: LiveData<Boolean> = _cadastroResult
+    private val _cadastroSucesso = MutableLiveData<Boolean>()
+    val cadastroSucesso: LiveData<Boolean> = _cadastroSucesso
 
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> = _errorMessage
 
-    // ========================================================================
-    // LÓGICA DE LOGIN
-    // ========================================================================
+    // true = Login, false = Cadastro
+    private val _isLoginMode = MutableLiveData(true)
+    val isLoginMode: LiveData<Boolean> = _isLoginMode
+
+    // Verifica no banco se deve começar na tela de Login ou Cadastro
+    fun verificarEstadoInicial() {
+        viewModelScope.launch {
+            val temUsuarios = repository.temUsuariosCadastrados()
+            // Se tem usuários, vai para Login (true). Se não tem, vai para Cadastro (false)
+            _isLoginMode.value = temUsuarios
+        }
+    }
+
+    fun toggleMode() {
+        _isLoginMode.value = !(_isLoginMode.value ?: true)
+        _errorMessage.value = null
+    }
+
+    // Função auxiliar para mudar forçadamente para a tela de Login
+    fun irParaLogin() {
+        _isLoginMode.value = true
+        _errorMessage.value = null
+    }
 
     fun login(email: String, senha: String) {
+        if (email.isBlank() || senha.isBlank()) {
+            _errorMessage.value = "Preencha todos os campos."
+            return
+        }
+
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                _errorMessage.value = null // Limpa erros anteriores
-
+                _errorMessage.value = null
                 val usuario = repository.buscarUsuarioPorEmail(email)
 
-                // NOTA DE SEGURANÇA: Em um app real, compare Hashes, nunca texto puro!
                 if (usuario != null && usuario.senha == senha) {
-                    // SUCESSO
-                    // Dica: Aqui seria o lugar ideal para salvar o usuario.id no SharedPreferences
-                    // Ex: sessionManager.saveUserId(usuario.id)
-                    _loginResult.value = true
+                    _loginResult.value = usuario.id
                 } else {
-                    // FALHA
                     _errorMessage.value = "Email ou senha incorretos."
-                    _loginResult.value = false
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Erro ao fazer login: ${e.message}"
+                _errorMessage.value = "Erro: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    // ========================================================================
-    // LÓGICA DE CADASTRO
-    // ========================================================================
+    fun cadastrar(nome: String, email: String, senha: String, confirmarSenha: String) {
+        if (nome.isBlank() || email.isBlank() || senha.isBlank()) {
+            _errorMessage.value = "Preencha todos os campos."
+            return
+        }
+        if (senha != confirmarSenha) {
+            _errorMessage.value = "As senhas não coincidem."
+            return
+        }
 
-    fun cadastrar(nome: String, email: String, senha: String) {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
                 _errorMessage.value = null
 
-                // 1. Verifica duplicidade
                 val existente = repository.buscarUsuarioPorEmail(email)
-
                 if (existente != null) {
-                    _errorMessage.value = "Este email já está cadastrado."
-                    _cadastroResult.value = false
+                    _errorMessage.value = "Este email já está em uso."
                 } else {
-                    // 2. Cria e Salva
-                    val novoUsuario = Usuario(
-                        nome = nome,
-                        email = email,
-                        senha = senha
-                    )
+                    val novoUsuario = Usuario(nome = nome, email = email, senha = senha)
                     repository.cadastrarUsuario(novoUsuario)
 
-                    // 3. Opcional: Popular banco inicial se necessário
-                    // repository.verificarEPopularBanco()
-
-                    _cadastroResult.value = true
+                    // REQUISITO: Depois do cadastro manda pra tela de login
+                    _cadastroSucesso.value = true
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Erro ao cadastrar: ${e.message}"
-                _cadastroResult.value = false
             } finally {
                 _isLoading.value = false
             }
         }
     }
 }
-
-// ========================================================================
-// FACTORY (Necessária para passar o Repository no construtor)
-// ========================================================================
 
 class AuthViewModelFactory(private val repository: GameRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

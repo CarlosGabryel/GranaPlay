@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 interface GameDao {
 
     // ========================================================================
-    // GESTÃO DE CONTEÚDO (Módulos e Lições)
+    // GESTÃO DE CONTEÚDO
     // ========================================================================
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -28,12 +28,11 @@ interface GameDao {
     @Query("SELECT * FROM modulos ORDER BY ordem ASC")
     fun getTodosModulos(): Flow<List<Modulo>>
 
-    // CORREÇÃO: 'idModulo' mudou para 'modulo_id'
     @Query("SELECT * FROM licoes WHERE modulo_id = :moduloId ORDER BY ordem ASC")
     fun getLicoesDoModulo(moduloId: Long): Flow<List<Licao>>
 
     // ========================================================================
-    // QUIZ (Questões e Alternativas)
+    // QUIZ
     // ========================================================================
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -42,16 +41,14 @@ interface GameDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun inserirAlternativa(alternativa: Alternativa): Long
 
-    // CORREÇÃO: 'licaoId' mudou para 'licao_id'
     @Query("SELECT * FROM questoes WHERE licao_id = :licaoId")
     suspend fun getQuestoesDaLicao(licaoId: Long): List<Questao>
 
-    // CORREÇÃO: 'questaoId' mudou para 'questao_id'
     @Query("SELECT * FROM alternativas WHERE questao_id = :questaoId")
     suspend fun getAlternativasDaQuestao(questaoId: Long): List<Alternativa>
 
     // ========================================================================
-    // USUÁRIO (Perfil, Vidas e Economia)
+    // USUÁRIO
     // ========================================================================
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -69,29 +66,30 @@ interface GameDao {
     @Query("UPDATE usuarios SET moedas = :novasMoedas WHERE id = :id")
     suspend fun atualizarMoedas(id: Long, novasMoedas: Int)
 
-    // CORREÇÃO: 'pontosSaude' mudou para 'pontos_saude'
+    // Atualiza vidas (usado para recarga ou setar valor fixo)
     @Query("UPDATE usuarios SET pontos_saude = :novasVidas WHERE id = :id")
     suspend fun atualizarVidas(id: Long, novasVidas: Int)
+
+    // NOVO: Atualiza vidas E registra o timestamp da perda (para recarga funcionar)
+    @Query("UPDATE usuarios SET pontos_saude = :novasVidas, tempo_ultima_vida_perdida = :timestamp WHERE id = :id")
+    suspend fun registrarPerdaVida(id: Long, novasVidas: Int, timestamp: Long)
 
     @Query("UPDATE usuarios SET xp = xp + :quantidade WHERE id = :id")
     suspend fun adicionarXp(id: Long, quantidade: Int)
 
     // ========================================================================
-    // PROGRESSO E GAMIFICAÇÃO
+    // PROGRESSO
     // ========================================================================
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun registrarLicaoConcluida(progresso: UsuarioLicao)
 
-    // CORREÇÃO: Colunas da tabela de junção mudaram para 'usuario_id' e 'licao_id'
     @Query("SELECT EXISTS(SELECT * FROM usuario_licoes WHERE usuario_id = :userId AND licao_id = :licaoId)")
     suspend fun isLicaoConcluida(userId: Long, licaoId: Long): Boolean
 
-    // CORREÇÃO: 'idModulo' -> 'modulo_id'
     @Query("SELECT COUNT(*) FROM licoes WHERE modulo_id = :moduloId")
     suspend fun contarLicoesDoModulo(moduloId: Long): Int
 
-    // CORREÇÃO: Atualizei todos os joins para usar snake_case (licao_id, usuario_id, modulo_id)
     @Query("""
         SELECT COUNT(*) FROM usuario_licoes 
         INNER JOIN licoes ON usuario_licoes.licao_id = licoes.id 
@@ -99,7 +97,6 @@ interface GameDao {
     """)
     suspend fun contarLicoesConcluidasNoModulo(usuarioId: Long, moduloId: Long): Int
 
-    // CORREÇÃO: Atualizei o WHERE e o sub-select para snake_case
     @Query("""
         SELECT * FROM licoes 
         WHERE modulo_id = :moduloId 
@@ -108,4 +105,11 @@ interface GameDao {
         LIMIT 1
     """)
     suspend fun getProximaLicaoPendente(usuarioId: Long, moduloId: Long): Licao?
+
+    // NOVO: Observa mudanças no progresso para atualizar a Home em tempo real
+    @Query("SELECT * FROM usuario_licoes WHERE usuario_id = :userId")
+    fun getProgressoFlow(userId: Long): Flow<List<UsuarioLicao>>
+
+    @Query("SELECT COUNT(*) FROM usuarios")
+    suspend fun contarUsuarios(): Int
 }

@@ -9,45 +9,71 @@ import com.example.granaplay.data.GameRepository
 import com.example.granaplay.data.Usuario
 import kotlinx.coroutines.launch
 
+/**
+ * Gerencia a lógica de autenticação (Login e Cadastro).
+ * Interage com o repositório para validar credenciais e criar novos usuários.
+ */
 class AuthViewModel(private val repository: GameRepository) : ViewModel() {
+
+    // ========================================================================
+    // ESTADOS DA UI (LiveData)
+    // ========================================================================
 
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
 
-    private val _loginResult = MutableLiveData<Long?>() // Retorna o ID se sucesso
+    // Retorna o ID do usuário em caso de sucesso no Login (Navegação para Home)
+    private val _loginResult = MutableLiveData<Long?>()
     val loginResult: LiveData<Long?> = _loginResult
 
+    // Sinaliza que o cadastro foi concluído (Navegação para aba de Login)
     private val _cadastroSucesso = MutableLiveData<Boolean>()
     val cadastroSucesso: LiveData<Boolean> = _cadastroSucesso
 
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> = _errorMessage
 
-    // true = Login, false = Cadastro
+    // Controla qual formulário exibir: true = Login, false = Cadastro
     private val _isLoginMode = MutableLiveData(true)
     val isLoginMode: LiveData<Boolean> = _isLoginMode
 
-    // Verifica no banco se deve começar na tela de Login ou Cadastro
+    // ========================================================================
+    // CONTROLE DE NAVEGAÇÃO E MODO
+    // ========================================================================
+
+    /**
+     * Verifica no banco de dados se existem usuários cadastrados.
+     * Se não houver ninguém (primeiro uso), inicia diretamente na tela de Cadastro.
+     */
     fun verificarEstadoInicial() {
         viewModelScope.launch {
             val temUsuarios = repository.temUsuariosCadastrados()
-            // Se tem usuários, vai para Login (true). Se não tem, vai para Cadastro (false)
             _isLoginMode.value = temUsuarios
         }
     }
 
+    /**
+     * Alterna entre os modos de Login e Cadastro.
+     */
     fun toggleMode() {
         _isLoginMode.value = !(_isLoginMode.value ?: true)
         _errorMessage.value = null
     }
 
-    // Função auxiliar para mudar forçadamente para a tela de Login
+    /**
+     * Força a transição para a tela de Login (usado após um cadastro bem-sucedido).
+     */
     fun irParaLogin() {
         _isLoginMode.value = true
         _errorMessage.value = null
     }
 
+    // ========================================================================
+    // AÇÕES DE AUTENTICAÇÃO
+    // ========================================================================
+
     fun login(email: String, senha: String) {
+        // 1. Validação Básica
         if (email.isBlank() || senha.isBlank()) {
             _errorMessage.value = "Preencha todos os campos."
             return
@@ -57,6 +83,8 @@ class AuthViewModel(private val repository: GameRepository) : ViewModel() {
             try {
                 _isLoading.value = true
                 _errorMessage.value = null
+
+                // 2. Busca e Verificação
                 val usuario = repository.buscarUsuarioPorEmail(email)
 
                 if (usuario != null && usuario.senha == senha) {
@@ -73,6 +101,7 @@ class AuthViewModel(private val repository: GameRepository) : ViewModel() {
     }
 
     fun cadastrar(nome: String, email: String, senha: String, confirmarSenha: String) {
+        // 1. Validação dos Campos
         if (nome.isBlank() || email.isBlank() || senha.isBlank()) {
             _errorMessage.value = "Preencha todos os campos."
             return
@@ -87,14 +116,15 @@ class AuthViewModel(private val repository: GameRepository) : ViewModel() {
                 _isLoading.value = true
                 _errorMessage.value = null
 
+                // 2. Verifica duplicidade
                 val existente = repository.buscarUsuarioPorEmail(email)
                 if (existente != null) {
                     _errorMessage.value = "Este email já está em uso."
                 } else {
+                    // 3. Cria novo usuário
                     val novoUsuario = Usuario(nome = nome, email = email, senha = senha)
                     repository.cadastrarUsuario(novoUsuario)
 
-                    // REQUISITO: Depois do cadastro manda pra tela de login
                     _cadastroSucesso.value = true
                 }
             } catch (e: Exception) {
@@ -106,12 +136,16 @@ class AuthViewModel(private val repository: GameRepository) : ViewModel() {
     }
 }
 
+// ========================================================================
+// FACTORY
+// ========================================================================
+
 class AuthViewModelFactory(private val repository: GameRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return AuthViewModel(repository) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Classe ViewModel desconhecida")
     }
 }

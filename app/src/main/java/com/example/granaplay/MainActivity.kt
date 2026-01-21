@@ -36,13 +36,18 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupEdgeToEdge()     // 1. Configura tela cheia
-        setupViewModel()      // 2. Inicializa dados
-        setupBottomNav()      // 3. Configura navegação e menu inferior
+        // 1. Configura UI (Tela Cheia / Edge-to-Edge)
+        setupEdgeToEdge()
+
+        // 2. Inicializa dependências
+        setupViewModel()
+
+        // 3. Configura Navegação (Bottom Bar em Compose)
+        setupBottomNav()
     }
 
     // ========================================================================
-    // CONFIGURAÇÃO DE UI E SISTEMA
+    // 1. CONFIGURAÇÃO DE UI (SYSTEM BARS)
     // ========================================================================
 
     private fun setupEdgeToEdge() {
@@ -52,10 +57,14 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
 
-        // Define se os ícones da barra de status devem ser escuros (true) ou claros (false)
+        // Define ícones escuros na barra de status (para fundos claros)
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         insetsController.isAppearanceLightStatusBars = true
     }
+
+    // ========================================================================
+    // 2. VIEW MODEL E DADOS
+    // ========================================================================
 
     private fun setupViewModel() {
         val database = AppDatabase.getDatabase(this)
@@ -65,21 +74,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ========================================================================
-    // NAVEGAÇÃO E MENU INFERIOR (COMPOSE)
+    // 3. NAVEGAÇÃO E MENU (COMPOSE + JETPACK NAV)
     // ========================================================================
 
     private fun setupBottomNav() {
         val navController = findNavController(R.id.nav_host_fragment_activity_main)
 
         binding.composeBottomBar.apply {
-            // CRUCIAL: Garante que o Compose limpe a memória corretamente
+            // Estratégia de limpeza de memória crucial para integração XML/Compose
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
 
             setContent {
-                // Estado local para saber qual aba está ativa e pintar o ícone corretamente
+                // Estado para rastrear a aba ativa
                 var currentRouteId by remember { mutableStateOf(navController.currentDestination?.id) }
 
-                // Listener para atualizar a aba selecionada quando a navegação ocorrer (inclusive via Back Button)
+                // Listener: Atualiza a UI do menu sempre que a navegação mudar (ex: ao voltar)
                 DisposableEffect(navController) {
                     val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
                         currentRouteId = destination.id
@@ -90,7 +99,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // Renderiza o componente visual do menu
+                // Renderiza o Menu Customizado
                 CustomBottomNavigation(
                     items = getMenuItems(),
                     currentDestinationId = currentRouteId,
@@ -102,16 +111,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Executa a navegação segura entre abas, preservando o estado e pilha.
+     */
     private fun navigateToTab(navController: NavController, destinationId: Int) {
-        // Evita recarregar a tela se o usuário clicar na aba que já está aberta
+        // Evita recarregar se já estiver na tela
         if (navController.currentDestination?.id == destinationId) return
 
         val options = navOptions {
-            // Salva o estado da tela ao sair e restaura ao voltar
+            // Limpa a pilha até a Home ao trocar de aba (comportamento padrão Android)
             popUpTo(navController.graph.startDestinationId) {
                 saveState = true
             }
+            // Evita criar múltiplas instâncias da mesma tela
             launchSingleTop = true
+            // Restaura o estado anterior da aba ao voltar para ela
             restoreState = true
         }
         navController.navigate(destinationId, null, options)
@@ -127,7 +141,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // Suporte para o botão "Voltar" físico do Android
+    // Suporte ao botão de voltar físico/gesto
     override fun onSupportNavigateUp(): Boolean {
         val navController = findNavController(R.id.nav_host_fragment_activity_main)
         return navController.navigateUp() || super.onSupportNavigateUp()

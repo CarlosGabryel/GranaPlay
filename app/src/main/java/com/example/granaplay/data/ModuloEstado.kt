@@ -1,17 +1,19 @@
 package com.example.granaplay.data
 
 /**
- * Modelo de UI (View Object) que agrega a entidade Módulo com o progresso do usuário.
- * Esta classe não é salva no Banco de Dados.
+ * Objeto de UI (View Object) que combina a entidade [Modulo] com o progresso do usuário.
+ * Usado para alimentar a lista na tela principal.
  */
 data class ModuloEstado(
-    // Dados estáticos do módulo (Título, Descrição, Ordem)
     val modulo: Modulo,
-
-    // Métricas de progresso
     val totalLicoes: Int,
     val licoesConcluidas: Int,
-
-    // Estado de acesso (baseado na conclusão do módulo anterior)
     val isBloqueado: Boolean
-)
+) {
+    /**
+     * Retorna a porcentagem de conclusão (0 a 100).
+     * Facilita a configuração de ProgressBar na interface.
+     */
+    val progressoPercentual: Int
+        get() = if (totalLicoes > 0) (licoesConcluidas * 100) / totalLicoes else 0
+}

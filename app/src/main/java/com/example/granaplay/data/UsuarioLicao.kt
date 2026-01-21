@@ -5,9 +5,13 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 
+/**
+ * Tabela de junção (Join Table) que registra o progresso.
+ * Conecta [Usuario] e [Licao], indicando quais lições foram concluídas.
+ */
 @Entity(
     tableName = "usuario_licoes",
-    // Chave composta: Um usuário só pode completar a mesma lição uma vez
+    // Chave composta: Impede duplicidade (um usuário só completa a lição uma vez)
     primaryKeys = ["usuario_id", "licao_id"],
     foreignKeys = [
         ForeignKey(
@@ -23,7 +27,7 @@ import androidx.room.Index
             onDelete = ForeignKey.CASCADE
         )
     ],
-    // Cria índice para a coluna da lição para otimizar a verificação da chave estrangeira
+    // Índice na coluna "child" (licao_id) é vital para performance de JOINs e verificação de FK
     indices = [Index(value = ["licao_id"])]
 )
 data class UsuarioLicao(

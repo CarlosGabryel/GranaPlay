@@ -40,6 +40,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
@@ -51,15 +52,23 @@ import com.example.granaplay.data.Questao
 import com.example.granaplay.ui.theme.Baloo2FontFamily
 import com.example.granaplay.ui.theme.BalooFontFamily
 
+// ========================================================================
+// 1. ACTIVITY E CONFIGURAÇÃO
+// ========================================================================
+
 class LessonActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Recupera ID do módulo passado via Intent
         val moduloId = intent.getLongExtra("MODULO_ID", -1)
+
+        // Configuração manual de Injeção de Dependência
         val repository = GameRepository(AppDatabase.getDatabase(this).gameDao())
         val factory = LessonViewModelFactory(repository)
         val viewModel = ViewModelProvider(this, factory)[LessonViewModel::class.java]
 
+        // Inicia a carga da lição
         viewModel.carregarLicao(usuarioId = 1L, moduloId = moduloId)
 
         setContent {
@@ -70,46 +79,50 @@ class LessonActivity : ComponentActivity() {
     }
 }
 
-// ==========================================
-// CORES DA LIÇÃO
-// ==========================================
+// ========================================================================
+// 2. PALETA DE CORES (ESPECÍFICA DA LIÇÃO)
+// ========================================================================
+
 private object LessonColors {
     val Background = Color(0xFFE1F5FE)
     val TitleText = Color(0xFF01579B)
     val QuestionText = Color(0xFF4E4141)
 
-    // Botões
+    // Estados dos Botões de Alternativa
     val AltUnselectedBorder = Color(0xFF848484)
     val AltUnselectedShadow = Color(0xFF848484)
     val AltUnselectedText = Color(0xFF848484)
     val AltUnselectedBg = Color(0xFFE1F5FE)
 
-    val AltSelectedBorder = Color(0xFF006386)
-    val AltSelectedShadow = Color(0xFF006386)
+    val AltSelectedBorder = Color(0xFF0FB2CB)
+    val AltSelectedShadow = Color(0xFF0FB2CB)
     val AltSelectedText = Color(0xFF006386)
-    val AltSelectedBg = Color(0xFFE1F5FE)
+    val AltSelectedBg = Color(0xFF19F0FF)
 
+
+    // Estados do Botão Verificar
     val VerifyEnabledBg = Color(0xFFFFCC29)
     val VerifyEnabledBorder = Color(0xFFDBA906)
     val VerifyEnabledShadow = Color(0xFFDBA906)
     val VerifyEnabledText = Color(0xFF006386)
+
 
     val VerifyDisabledBg = Color(0xFFA29C9C)
     val VerifyDisabledBorder = Color(0xFF848484)
     val VerifyDisabledShadow = Color(0xFF848484)
     val VerifyDisabledText = Color(0xFF585656)
 
+    // Barra de Progresso
     val ProgressBarTrack = Color(0xFF006386)
     val ProgressBarFill = Color(0xFF1CEE00)
 
-    // Feedback
+    // Feedback (Bottom Sheet)
     val SuccessBg = Color(0xFFD7FFB8)
     val SuccessText = Color(0xFF58A700)
     val SuccessShadow = Color(0xFF428000)
 
     val ErrorBg = Color(0xFFFFDFE0)
     val ErrorText = Color(0xFFEA2B2B)
-
     val ErrorBtnBg = Color(0xFFFF0000)
     val ErrorBtnShadow = Color(0xFFBA0000)
     val ErrorBtnText = Color.White
@@ -125,19 +138,30 @@ private object LessonColors {
     val CoinCardText = Color(0xFFF57C00)
 }
 
+// ========================================================================
+// 3. NAVEGAÇÃO E GERENCIAMENTO DE ESTADO
+// ========================================================================
+
+/**
+ * Composable raiz que gerencia a transição entre estados da lição
+ * (Carregando, Jogando, Concluído).
+ */
 @Composable
 fun LessonScreen(viewModel: LessonViewModel, onClose: () -> Unit) {
     val uiState by viewModel.uiState.observeAsState(LessonUiState.Loading)
     val feedbackState by viewModel.feedbackState.observeAsState(FeedbackState.Hidden)
 
-    Box(modifier = Modifier.fillMaxSize().background(LessonColors.Background)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(LessonColors.Background)
+    ) {
         when (val state = uiState) {
             is LessonUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = LessonColors.ProgressBarTrack)
                 }
             }
-            // NOVO: Tela de Conclusão
             is LessonUiState.Completed -> {
                 LessonCompletedScreen(
                     xp = state.xpGanho,
@@ -170,14 +194,20 @@ fun LessonScreen(viewModel: LessonViewModel, onClose: () -> Unit) {
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
             }
-            is LessonUiState.Error -> {}
+            is LessonUiState.Error -> {
+                // TODO: Implementar tela de erro genérica se necessário
+            }
         }
     }
 }
 
-// ==========================================
-// TELA DE CONCLUSÃO
-// ==========================================
+// ========================================================================
+// 4. TELAS PRINCIPAIS
+// ========================================================================
+
+/**
+ * TELA 1: Exibida quando o usuário completa a lição com sucesso.
+ */
 @Composable
 fun LessonCompletedScreen(xp: Int, moedas: Int, onClose: () -> Unit) {
     Column(
@@ -189,7 +219,7 @@ fun LessonCompletedScreen(xp: Int, moedas: Int, onClose: () -> Unit) {
     ) {
         Spacer(modifier = Modifier.height(30.dp))
 
-        // Balão Azul
+        // Balão de Texto "Parabéns"
         Box(contentAlignment = Alignment.BottomCenter) {
             Box(
                 modifier = Modifier
@@ -223,7 +253,7 @@ fun LessonCompletedScreen(xp: Int, moedas: Int, onClose: () -> Unit) {
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Robô
+        // Avatar do Robô
         Image(
             painter = painterResource(id = R.drawable.ic_robot_body),
             contentDescription = "Robô Feliz",
@@ -244,14 +274,14 @@ fun LessonCompletedScreen(xp: Int, moedas: Int, onClose: () -> Unit) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Cards de XP e Moedas
+        // Cards de Recompensa (XP e Moedas)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             StatCard(
-                iconRes = R.drawable.ic_robot_face, // Ícone de XP/Rosto
+                iconRes = R.drawable.ic_robot_face,
                 value = "$xp XP",
                 borderColor = LessonColors.XpCardBorder,
                 shadowColor = LessonColors.XpCardShadow,
@@ -262,7 +292,7 @@ fun LessonCompletedScreen(xp: Int, moedas: Int, onClose: () -> Unit) {
             Spacer(modifier = Modifier.width(24.dp))
 
             StatCard(
-                iconRes = R.drawable.ic_one_coin, // Ícone de moeda
+                iconRes = R.drawable.ic_one_coin,
                 value = "$ $moedas",
                 borderColor = LessonColors.CoinCardBorder,
                 shadowColor = LessonColors.CoinCardShadow,
@@ -275,7 +305,7 @@ fun LessonCompletedScreen(xp: Int, moedas: Int, onClose: () -> Unit) {
 
         GameButton3D(
             text = "VOLTAR PARA O MAPA",
-            onClick = onClose, // Fecha a activity
+            onClick = onClose,
             mainColor = LessonColors.VerifyEnabledBg,
             shadowColor = LessonColors.VerifyEnabledShadow,
             borderColor = LessonColors.VerifyEnabledBorder,
@@ -288,61 +318,9 @@ fun LessonCompletedScreen(xp: Int, moedas: Int, onClose: () -> Unit) {
     }
 }
 
-@Composable
-fun StatCard(
-    iconRes: Int,
-    value: String,
-    borderColor: Color,
-    shadowColor: Color,
-    textColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val cornerRadius = 12.dp
-    val shadowHeight = 4.dp
-    val height = 110.dp
-
-    Box(modifier = modifier.height(height)) {
-        // Sombra
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 4.dp)
-                .clip(RoundedCornerShape(cornerRadius))
-                .background(shadowColor)
-        )
-        // Frente
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(bottom = shadowHeight)
-                .border(2.dp, borderColor, RoundedCornerShape(cornerRadius))
-                .clip(RoundedCornerShape(cornerRadius))
-                .background(Color.White),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    contentScale = ContentScale.Fit
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = value,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                    fontFamily = BalooFontFamily
-                )
-            }
-        }
-    }
-}
-
-// ... (Mantenha LessonContent, FeedbackSheet e componentes auxiliares como estavam) ...
-
+/**
+ * TELA 2: O conteúdo interativo da lição (Pergunta e Alternativas).
+ */
 @Composable
 fun LessonContent(
     questao: Questao,
@@ -353,9 +331,11 @@ fun LessonContent(
     onClose: () -> Unit,
     onVerificar: (Long) -> Unit
 ) {
+    // Estado local para armazenar qual opção o usuário selecionou antes de verificar
     var selectedOptionId by remember(questao.id) { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
 
+    // Prepara as imagens das alternativas (converte String nome -> Int resourceId)
     val preparedAlternativas = remember(alternativas) {
         alternativas.map { alt ->
             val resId = getDrawableId(context, alt.imagemSource)
@@ -369,6 +349,7 @@ fun LessonContent(
             .padding(horizontal = 32.dp, vertical = 16.dp)
             .statusBarsPadding()
     ) {
+        // Barra Superior
         HeaderSection(
             progresso = progressoAtual.toFloat() / totalQuestoes.toFloat(),
             vidas = vidasAtuais,
@@ -377,6 +358,7 @@ fun LessonContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Enunciado e Áudio
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "Leia e responda:",
@@ -389,7 +371,7 @@ fun LessonContent(
             Image(
                 painter = painterResource(id = R.drawable.ic_sound),
                 contentDescription = "Ouvir",
-                modifier = Modifier.size(48.dp).clickable { }
+                modifier = Modifier.size(48.dp).clickable { /* Ação de Áudio Futura */ }
             )
         }
 
@@ -407,6 +389,7 @@ fun LessonContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Renderização Condicional de Layout (Grade de Imagens ou Lista de Texto)
         if (questao.tipo == "IMAGE_4") {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -451,6 +434,7 @@ fun LessonContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Botão Verificar (Só habilita se algo foi selecionado)
         val isVerifyEnabled = selectedOptionId != null
         val (vMain, vShadow, vBorder, vText) = if (isVerifyEnabled) {
             listOf(LessonColors.VerifyEnabledBg, LessonColors.VerifyEnabledShadow, LessonColors.VerifyEnabledBorder, LessonColors.VerifyEnabledText)
@@ -474,6 +458,10 @@ fun LessonContent(
     }
 }
 
+// ========================================================================
+// 5. FEEDBACK (BOTTOM SHEET)
+// ========================================================================
+
 @Composable
 fun FeedbackSheet(
     feedbackState: FeedbackState,
@@ -482,6 +470,7 @@ fun FeedbackSheet(
 ) {
     val isVisible = feedbackState !is FeedbackState.Hidden
 
+    // Configuração visual baseada no estado (Correto, Erro, Game Over)
     val backgroundColor = when (feedbackState) {
         is FeedbackState.Correct -> LessonColors.SuccessBg
         is FeedbackState.Incorrect -> LessonColors.ErrorBg
@@ -560,30 +549,117 @@ fun FeedbackSheet(
     }
 }
 
-fun getDrawableId(context: Context, name: String?): Int {
-    if (name.isNullOrEmpty()) return R.drawable.ic_close
-    val id = context.resources.getIdentifier(name, "drawable", context.packageName)
-    return if (id != 0) id else R.drawable.ic_close
-}
+// ========================================================================
+// 6. COMPONENTES DE UI REUTILIZÁVEIS E HELPERS
+// ========================================================================
 
+/**
+ * Header da lição contendo botão de fechar, barra de progresso e contador de vidas.
+ */
 @Composable
-fun getButtonColors(isSelected: Boolean): List<Color> {
-    return if (isSelected) {
-        listOf(LessonColors.AltSelectedBg, LessonColors.AltSelectedShadow, LessonColors.AltSelectedBorder)
-    } else {
-        listOf(LessonColors.AltUnselectedBg, LessonColors.AltUnselectedShadow, LessonColors.AltUnselectedBorder)
+fun HeaderSection(progresso: Float, vidas: Int, onClose: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_close),
+            contentDescription = "Fechar",
+            modifier = Modifier
+                .size(32.dp)
+                .clickable { onClose() }
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        LinearProgressIndicator(
+            progress = progresso,
+            modifier = Modifier
+                .weight(1f)
+                .height(16.dp)
+                .clip(RoundedCornerShape(50)),
+            color = LessonColors.ProgressBarFill,
+            trackColor = LessonColors.ProgressBarTrack
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Image(
+            painter = painterResource(id = R.drawable.ic_heart),
+            contentDescription = null,
+            modifier = Modifier.size(28.dp),
+            contentScale = ContentScale.Fit
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = vidas.toString(),
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Red,
+            fontFamily = BalooFontFamily
+        )
     }
 }
 
+/**
+ * Card estatístico para exibir XP e Moedas na tela de conclusão.
+ */
 @Composable
-fun getButtonColorsText(isSelected: Boolean): List<Color> {
-    return if (isSelected) {
-        listOf(LessonColors.AltSelectedBg, LessonColors.AltSelectedShadow, LessonColors.AltSelectedBorder, LessonColors.AltSelectedText)
-    } else {
-        listOf(LessonColors.AltUnselectedBg, LessonColors.AltUnselectedShadow, LessonColors.AltUnselectedBorder, LessonColors.AltUnselectedText)
+fun StatCard(
+    iconRes: Int,
+    value: String,
+    borderColor: Color,
+    shadowColor: Color,
+    textColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val cornerRadius = 12.dp
+    val shadowHeight = 4.dp
+    val height = 110.dp
+
+    Box(modifier = modifier.height(height)) {
+        // Sombra
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 4.dp)
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(shadowColor)
+        )
+        // Frente
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .padding(bottom = shadowHeight)
+                .border(2.dp, borderColor, RoundedCornerShape(cornerRadius))
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    contentScale = ContentScale.Fit
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = value,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    fontFamily = BalooFontFamily
+                )
+            }
+        }
     }
 }
 
+/**
+ * Botão genérico com efeito 3D (Sombra e profundidade).
+ */
 @Composable
 fun GameButton3D(
     text: String,
@@ -594,7 +670,7 @@ fun GameButton3D(
     textColor: Color,
     enabled: Boolean = true,
     height: Dp = 70.dp,
-    fontSize: androidx.compose.ui.unit.TextUnit = 18.sp
+    fontSize: TextUnit = 18.sp
 ) {
     val cornerRadius = 10.dp
     val shadowHeight = 5.dp
@@ -608,7 +684,12 @@ fun GameButton3D(
         modifier = Modifier
             .fillMaxWidth()
             .height(height)
-            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            )
     ) {
         Box(
             modifier = Modifier
@@ -639,6 +720,9 @@ fun GameButton3D(
     }
 }
 
+/**
+ * Botão 3D específico para exibir imagens (usado nas alternativas de grade).
+ */
 @Composable
 fun GameImageButton3D(
     imageResId: Int,
@@ -691,47 +775,28 @@ fun GameImageButton3D(
     }
 }
 
+// --- Helpers de Recursos e Cores ---
+
+fun getDrawableId(context: Context, name: String?): Int {
+    if (name.isNullOrEmpty()) return R.drawable.ic_close
+    val id = context.resources.getIdentifier(name, "drawable", context.packageName)
+    return if (id != 0) id else R.drawable.ic_close
+}
+
 @Composable
-fun HeaderSection(progresso: Float, vidas: Int, onClose: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_close),
-            contentDescription = "Fechar",
-            modifier = Modifier
-                .size(32.dp)
-                .clickable { onClose() }
-        )
+fun getButtonColors(isSelected: Boolean): List<Color> {
+    return if (isSelected) {
+        listOf(LessonColors.AltSelectedBg, LessonColors.AltSelectedShadow, LessonColors.AltSelectedBorder)
+    } else {
+        listOf(LessonColors.AltUnselectedBg, LessonColors.AltUnselectedShadow, LessonColors.AltUnselectedBorder)
+    }
+}
 
-        Spacer(modifier = Modifier.width(12.dp))
-
-        LinearProgressIndicator(
-            progress = progresso,
-            modifier = Modifier
-                .weight(1f)
-                .height(16.dp)
-                .clip(RoundedCornerShape(50)),
-            color = LessonColors.ProgressBarFill,
-            trackColor = LessonColors.ProgressBarTrack
-        )
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Image(
-            painter = painterResource(id = R.drawable.ic_heart),
-            contentDescription = null,
-            modifier = Modifier.size(28.dp),
-            contentScale = ContentScale.Fit
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = vidas.toString(),
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Red,
-            fontFamily = BalooFontFamily
-        )
+@Composable
+fun getButtonColorsText(isSelected: Boolean): List<Color> {
+    return if (isSelected) {
+        listOf(LessonColors.AltSelectedBg, LessonColors.AltSelectedShadow, LessonColors.AltSelectedBorder, LessonColors.AltSelectedText)
+    } else {
+        listOf(LessonColors.AltUnselectedBg, LessonColors.AltUnselectedShadow, LessonColors.AltUnselectedBorder, LessonColors.AltUnselectedText)
     }
 }

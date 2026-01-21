@@ -6,6 +6,12 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Representa uma opção de resposta associada a uma [Questao].
+ *
+ * Configurada com [ForeignKey.CASCADE]: Se a Questão pai for deletada,
+ * todas as alternativas associadas serão removidas automaticamente.
+ */
 @Entity(
     tableName = "alternativas",
     foreignKeys = [
@@ -16,7 +22,8 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["questao_id"])] // Otimização para chaves estrangeiras
+    // Índice essencial para performance de queries com JOIN e verificação de FK
+    indices = [Index(value = ["questao_id"])]
 )
 data class Alternativa(
     @PrimaryKey(autoGenerate = true)
@@ -31,5 +38,5 @@ data class Alternativa(
     val isCorreta: Boolean,
 
     @ColumnInfo(name = "imagem_src")
-    val imagemSource: String? = null // Caminho ou nome do resource
+    val imagemSource: String? = null
 )

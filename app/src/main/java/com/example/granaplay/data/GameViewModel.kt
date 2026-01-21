@@ -9,81 +9,79 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
+/**
+ * Gerencia o estado da UI para a tela principal (Home) e lógica geral do jogo.
+ * Responsável por inicializar o banco e conectar os fluxos de dados do Repositório.
+ */
 class GameViewModel(private val repository: GameRepository) : ViewModel() {
 
     // ========================================================================
-    // ESTADOS (State)
+    // ESTADOS DA UI
     // ========================================================================
 
     private val _isLoading = MutableLiveData(true)
     val isLoading: LiveData<Boolean> = _isLoading
 
+    // Lista de módulos com seus estados (bloqueado/desbloqueado/progresso)
     private val _estadoModulos = MutableLiveData<List<ModuloEstado>>()
     val estadoModulos: LiveData<List<ModuloEstado>> = _estadoModulos
-
-    // Variável que guardará o LiveData do usuário após o login/identificação
-    var usuarioAtual: LiveData<Usuario>? = null
 
     // ========================================================================
     // INICIALIZAÇÃO
     // ========================================================================
 
     init {
-        inicializarAplicacao()
-    }
-
-    private fun inicializarAplicacao() {
+        // Garante que o banco tenha dados (seed) ao iniciar o ViewModel
         viewModelScope.launch {
-            _isLoading.value = true
-
-            // Popula o banco com os módulos/lições iniciais se necessário
             repository.verificarEPopularBanco()
-
             _isLoading.value = false
         }
     }
 
     // ========================================================================
-    // LÓGICA DO USUÁRIO
+    // GESTÃO DO USUÁRIO
     // ========================================================================
 
-    fun carregarDadosUsuario(usuarioId: Long) {
+    /**
+     * Inicia o monitoramento dos dados do usuário e do progresso dos módulos.
+     * Deve ser chamado assim que o ID do usuário logado estiver disponível.
+     */
+    fun iniciarSessaoUsuario(usuarioId: Long): LiveData<Usuario> {
+        // 1. Verifica regras de negócio (Recarga de vidas por tempo)
         viewModelScope.launch {
-            // Verifica regras de negócio (recarga de vidas) antes de expor os dados
             repository.verificarRecargaDeVidas(usuarioId)
         }
 
-        // Configura o observável do usuário se ainda não estiver configurado
-        if (usuarioAtual == null) {
-            usuarioAtual = repository.getUsuarioEmTempoReal(usuarioId).asLiveData()
-        }
-
-        // Inicia o monitoramento do progresso dos módulos para este usuário
-        monitorarProgressoModulos(usuarioId)
-    }
-
-    private fun monitorarProgressoModulos(usuarioId: Long) {
+        // 2. Inicia monitoramento dos módulos para este usuário
         viewModelScope.launch {
-            // Coleta o Flow do repositório e atualiza o LiveData da UI
             repository.getModulosComEstado(usuarioId).collect { estados ->
                 _estadoModulos.value = estados
             }
         }
+
+        // 3. Retorna o LiveData do usuário em tempo real
+        return repository.getUsuarioEmTempoReal(usuarioId).asLiveData()
     }
 
     // ========================================================================
-    // NAVEGAÇÃO E CONTEÚDO
+    // NAVEGAÇÃO E LÓGICA
     // ========================================================================
 
-    fun getProximaLicao(usuarioId: Long, moduloId: Long, onResult: (Licao?) -> Unit) {
+    /**
+     * Busca a próxima lição pendente para um módulo específico.
+     * Usado para o botão "Continuar" ou ao clicar num módulo.
+     */
+    fun buscarProximaLicao(usuarioId: Long, moduloId: Long, onResult: (Licao?) -> Unit) {
         viewModelScope.launch {
             val licao = repository.getProximaLicao(usuarioId, moduloId)
             onResult(licao)
         }
     }
 
-    // Retorna Flow diretamente para ser consumido pela UI ou convertido
-    fun getLicoes(moduloId: Long): Flow<List<Licao>> {
+    /**
+     * Retorna o fluxo de lições para a tela de detalhes do módulo.
+     */
+    fun getLicoesDoModulo(moduloId: Long): Flow<List<Licao>> {
         return repository.getLicoesPorModulo(moduloId)
     }
 }
@@ -98,6 +96,6 @@ class GameViewModelFactory(private val repository: GameRepository) : ViewModelPr
             @Suppress("UNCHECKED_CAST")
             return GameViewModel(repository) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Classe ViewModel desconhecida")
     }
 }

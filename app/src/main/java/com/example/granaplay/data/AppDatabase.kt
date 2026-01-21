@@ -5,6 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
+/**
+ * Banco de dados principal do Room.
+ * Gerencia a conexão e a criação das instâncias dos DAOs.
+ */
 @Database(
     entities = [
         Usuario::class,
@@ -25,6 +29,14 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        /**
+         * Retorna a instância única do banco de dados (Singleton).
+         * Utiliza Double-Checked Locking para garantir thread-safety.
+         *
+         * @warning [fallbackToDestructiveMigration] está ativo.
+         * Isso apagará todos os dados se a versão do banco mudar.
+         * Para produção, implemente Migrations.
+         */
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -32,7 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "granaplay_database"
                 )
-                    .fallbackToDestructiveMigration() // Limpa o banco ao alterar versão (útil em dev)
+                    .fallbackToDestructiveMigration()
                     .build()
 
                 INSTANCE = instance

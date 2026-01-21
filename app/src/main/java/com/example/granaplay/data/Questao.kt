@@ -6,6 +6,12 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Representa uma pergunta dentro de uma [Licao].
+ *
+ * @property tipo Define o layout da questão. Deve corresponder aos valores
+ * do enum [TipoQuestao] (ex: "TEXT_2", "IMAGE_4").
+ */
 @Entity(
     tableName = "questoes",
     foreignKeys = [
@@ -16,7 +22,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    // Otimização essencial para evitar Full Table Scan ao buscar questões de uma lição
+    // Índice essencial para buscar todas as questões de uma lição rapidamente
     indices = [Index(value = ["licao_id"])]
 )
 data class Questao(
@@ -28,12 +34,12 @@ data class Questao(
 
     val enunciado: String,
 
+    // Armazena o nome do enum (ex: "TEXT_2") para definir o layout na UI
+    val tipo: String,
+
     @ColumnInfo(name = "feedback_acerto")
     val feedbackAcerto: String,
 
     @ColumnInfo(name = "feedback_erro")
-    val feedbackErro: String,
-
-    // Define o layout da questão (Ex: "TEXT_2" ou "IMAGE_4")
-    val tipo: String = "TEXT_2"
+    val feedbackErro: String
 )

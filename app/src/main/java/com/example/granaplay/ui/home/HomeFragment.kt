@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -39,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
@@ -49,10 +49,15 @@ import com.example.granaplay.data.GameRepository
 import com.example.granaplay.data.GameViewModel
 import com.example.granaplay.data.GameViewModelFactory
 import com.example.granaplay.data.ModuloEstado
+import com.example.granaplay.data.Usuario
 import com.example.granaplay.ui.lesson.LessonActivity
 import com.example.granaplay.ui.theme.Baloo2FontFamily
 import com.example.granaplay.ui.theme.BalooFontFamily
 import kotlin.math.min
+
+// ========================================================================
+// 1. FRAGMENTO E CONFIGURAÇÃO INICIAL
+// ========================================================================
 
 class HomeFragment : Fragment() {
 
@@ -68,18 +73,26 @@ class HomeFragment : Fragment() {
         val factory = GameViewModelFactory(repository)
         viewModel = ViewModelProvider(this, factory)[GameViewModel::class.java]
 
+        // Mock ID: 1L (Em produção viria da SessionManager)
         val userId = 1L
-        viewModel.carregarDadosUsuario(userId)
+
+        // CORREÇÃO: O método correto agora é 'iniciarSessaoUsuario'
+        // Ele retorna o LiveData que observaremos no Compose
+        val usuarioLiveData = viewModel.iniciarSessaoUsuario(userId)
 
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 val isLoading by viewModel.isLoading.observeAsState(true)
 
+                // CORREÇÃO: Observamos o LiveData retornado acima
+                val usuario by usuarioLiveData.observeAsState()
+
                 if (isLoading) {
                     LoadingScreen()
                 } else {
                     GameScreen(
+                        usuario = usuario, // Passamos o usuário já resolvido
                         viewModel = viewModel,
                         onModuleClick = { moduloId ->
                             val intent = Intent(requireContext(), LessonActivity::class.java)
@@ -94,7 +107,7 @@ class HomeFragment : Fragment() {
 }
 
 // ========================================================================
-// ESTILOS E CORES
+// 2. ESTILOS E CORES
 // ========================================================================
 
 private object HomeStyles {
@@ -105,16 +118,14 @@ private object HomeStyles {
     val TextLockedColor = Color(0xFF8FAAB6)
     val PillColor = Color(0xFF5FA8D3)
     val LoadingText = Color(0xFF136F91)
-
     val DialogTitle = Color(0xFFEA2B2B)
     val DialogText = Color(0xFF4E4141)
-    val GoldColor = Color(0xFFFFC107) // Cor dourada para a seta e título
+    val GoldColor = Color(0xFFFFC107)
 }
 
 // ========================================================================
-// TELAS PRINCIPAIS
+// 3. TELAS E LÓGICA PRINCIPAL
 // ========================================================================
-
 
 @Composable
 fun LoadingScreen() {
@@ -125,11 +136,10 @@ fun LoadingScreen() {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // AQUI: Trocado para o Logo do App
             Image(
-                painter = painterResource(id = R.drawable.img_splash),
+                painter = painterResource(id = R.drawable.ic_logo_auth),
                 contentDescription = "Carregando",
-                modifier = Modifier.size(150.dp), // Aumentei um pouco pois é logo
+                modifier = Modifier.size(200.dp),
                 contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.height(24.dp))
@@ -148,23 +158,20 @@ fun LoadingScreen() {
     }
 }
 
-
 @Composable
 fun GameScreen(
+    usuario: Usuario?, // Recebe o usuário como parâmetro
     viewModel: GameViewModel,
     onModuleClick: (Long) -> Unit
 ) {
-    val usuario by viewModel.usuarioAtual?.observeAsState() ?: androidx.compose.runtime.mutableStateOf(null)
     val modulos by viewModel.estadoModulos.observeAsState(emptyList())
 
-    // Estado para os Dialogs
     var showNoLivesDialog by remember { mutableStateOf(false) }
     var showCompletedDialog by remember { mutableStateOf(false) }
 
     if (showNoLivesDialog) {
         NoLivesDialog(onDismiss = { showNoLivesDialog = false })
     }
-
     if (showCompletedDialog) {
         ModuleCompletedDialog(onDismiss = { showCompletedDialog = false })
     }
@@ -189,22 +196,16 @@ fun GameScreen(
             GameMapArea(
                 modulos = modulos,
                 onModuleClick = { moduloId ->
-                    // 1. Encontra o módulo clicado na lista
                     val moduloClicado = modulos.find { it.modulo.id == moduloId }
 
                     if (moduloClicado != null) {
                         val isCompleted = (moduloClicado.licoesConcluidas == moduloClicado.totalLicoes) && moduloClicado.totalLicoes > 0
                         val vidasAtuais = usuario?.pontosSaude ?: 0
 
-                        if (isCompleted) {
-                            // CASO 1: Módulo já completo -> Mostra Dialog de "Dominado"
-                            showCompletedDialog = true
-                        } else if (vidasAtuais > 0) {
-                            // CASO 2: Tem vidas e não acabou -> Joga
-                            onModuleClick(moduloId)
-                        } else {
-                            // CASO 3: Sem vidas -> Mostra Dialog de erro
-                            showNoLivesDialog = true
+                        when {
+                            isCompleted -> showCompletedDialog = true
+                            vidasAtuais > 0 -> onModuleClick(moduloId)
+                            else -> showNoLivesDialog = true
                         }
                     }
                 },
@@ -217,116 +218,7 @@ fun GameScreen(
 }
 
 // ========================================================================
-// DIALOGS
-// ========================================================================
-
-@Composable
-fun NoLivesDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = "Vidas Esgotadas!",
-                    fontFamily = BalooFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    color = HomeStyles.DialogTitle,
-                    textAlign = TextAlign.Center
-                )
-            }
-        },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_heart_grey),
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Você precisa descansar um pouco para recuperar suas energias.\nVolte amanhã!",
-                    fontFamily = Baloo2FontFamily,
-                    fontSize = 18.sp,
-                    color = HomeStyles.DialogText,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 24.sp
-                )
-                Spacer(modifier = Modifier.height(32.dp))
-                GameButton3D(
-                    text = "ENTENDI",
-                    onClick = onDismiss,
-                    mainColor = HomeStyles.BlueBanner,
-                    shadowColor = HomeStyles.DarkBlueBanner,
-                    borderColor = HomeStyles.DarkBlueBanner,
-                    textColor = Color.White,
-                    height = 60.dp,
-                    fontSize = 20.sp
-                )
-            }
-        },
-        confirmButton = { },
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp)
-    )
-}
-
-// NOVO DIALOG PARA MÓDULO COMPLETO
-@Composable
-fun ModuleCompletedDialog(onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = "Módulo Dominado!",
-                    fontFamily = BalooFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    color = HomeStyles.GoldColor, // Dourado para celebrar
-                    textAlign = TextAlign.Center
-                )
-            }
-        },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                // Pode usar a imagem da estrela dourada aqui
-                Image(
-                    painter = painterResource(id = R.drawable.ic_star_gold),
-                    contentDescription = null,
-                    modifier = Modifier.size(80.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Parabéns! Você já completou todas as lições deste módulo.\nVocê é um expert!",
-                    fontFamily = Baloo2FontFamily,
-                    fontSize = 18.sp,
-                    color = HomeStyles.DialogText,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 24.sp
-                )
-                Spacer(modifier = Modifier.height(32.dp))
-                GameButton3D(
-                    text = "SHOW DE BOLA",
-                    onClick = onDismiss,
-                    mainColor = HomeStyles.BlueBanner,
-                    shadowColor = HomeStyles.DarkBlueBanner,
-                    borderColor = HomeStyles.DarkBlueBanner,
-                    textColor = Color.White,
-                    height = 60.dp,
-                    fontSize = 20.sp
-                )
-            }
-        },
-        confirmButton = { },
-        containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp)
-    )
-}
-
-
-// ========================================================================
-// MAPA E POSICIONAMENTO
+// 4. MAPA E ELEMENTOS DE NÍVEL
 // ========================================================================
 
 @Composable
@@ -336,8 +228,6 @@ fun GameMapArea(
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier) {
-
-        // Fundo (Estrada)
         Image(
             painter = painterResource(id = R.drawable.path),
             contentDescription = null,
@@ -348,7 +238,6 @@ fun GameMapArea(
                 .align(Alignment.Center)
         )
 
-        // Avatar (Robô)
         Image(
             painter = painterResource(id = R.drawable.ic_robot_body),
             contentDescription = "Avatar",
@@ -360,21 +249,17 @@ fun GameMapArea(
                 .offset(y = (-53).dp)
         )
 
-        // Renderiza os Módulos
         modulos.forEachIndexed { index, moduloEstado ->
             val isLeftAligned = (index % 2 != 0)
             val topOffset = 30.dp + (index * 120).dp
+
             val alignModifier = if (isLeftAligned) Alignment.TopStart else Alignment.TopEnd
             val paddingModifier = if (isLeftAligned)
                 Modifier.padding(top = topOffset, start = 18.dp)
             else
                 Modifier.padding(top = topOffset, end = 18.dp)
 
-            Box(
-                modifier = Modifier
-                    .align(alignModifier)
-                    .then(paddingModifier)
-            ) {
+            Box(modifier = Modifier.align(alignModifier).then(paddingModifier)) {
                 LevelItem(
                     moduloEstado = moduloEstado,
                     isLeftAligned = isLeftAligned,
@@ -387,42 +272,39 @@ fun GameMapArea(
             }
         }
 
-        // --- LÓGICA DA SETA FINAL ---
         val lastModuleY = 30 + (modulos.size * 120)
         val finalY = if (modulos.isNotEmpty()) lastModuleY.dp else 400.dp
-
-        // Verifica se O MUNDO INTEIRO está completo
         val isWorldCompleted = modulos.isNotEmpty() && modulos.all {
             it.licoesConcluidas == it.totalLicoes && it.totalLicoes > 0
         }
 
-        // Lógica do Filtro de Cor (ALTERADA PARA AMARELO/GOLD)
         val arrowColorFilter: ColorFilter? = if (isWorldCompleted) {
-            // SE COMPLETO: Aplica filtro AMARELO (Gold)
             ColorFilter.tint(HomeStyles.GoldColor)
         } else {
-            // SE INCOMPLETO: Deixa cinza (Saturação 0)
             ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
         }
 
         Image(
             painter = painterResource(id = R.drawable.ic_world_ending),
             contentDescription = "Próximo Mundo",
-            colorFilter = arrowColorFilter, // Aplica o filtro aqui
+            colorFilter = arrowColorFilter,
             modifier = Modifier
                 .size(150.dp)
                 .align(Alignment.TopEnd)
-                .offset(y = finalY - 50.dp, x = 18.dp)
-                .clickable(enabled = isWorldCompleted) {
-                    // Ação ao clicar na seta final (ex: ir para Mundo 2)
-                }
+                .offset(y = finalY - 30.dp, x = 18.dp)
+                .clickable(enabled = isWorldCompleted) { }
         )
     }
 }
 
 @Composable
-fun LevelItem(moduloEstado: ModuloEstado, isLeftAligned: Boolean, onClick: () -> Unit) {
+fun LevelItem(
+    moduloEstado: ModuloEstado,
+    isLeftAligned: Boolean,
+    onClick: () -> Unit
+) {
     val rowArrangement = if (isLeftAligned) Arrangement.Start else Arrangement.End
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = rowArrangement,
@@ -455,7 +337,7 @@ fun HexagonGroup(moduloEstado: ModuloEstado) {
 
     val levelImageRes = if (isCompleted) {
         when (moduloEstado.modulo.ordem) {
-            1 -> R.drawable.ic_modulo1_gold // TODO: Verifique se as imagens existem
+            1 -> R.drawable.ic_modulo1_gold
             2 -> R.drawable.ic_modulo2_gold
             3 -> R.drawable.ic_modulo3_gold
             4 -> R.drawable.ic_modulo4_gold
@@ -486,7 +368,10 @@ fun HexagonGroup(moduloEstado: ModuloEstado) {
                 .align(Alignment.BottomCenter),
             contentScale = ContentScale.Fit
         )
-        StarsLayout(total = moduloEstado.totalLicoes, concluidas = moduloEstado.licoesConcluidas)
+        StarsLayout(
+            total = moduloEstado.totalLicoes,
+            concluidas = moduloEstado.licoesConcluidas
+        )
     }
 }
 
@@ -498,17 +383,27 @@ fun BoxScope.StarsLayout(total: Int, concluidas: Int) {
         3 -> listOf(Pair(-40, -50), Pair(0, -70), Pair(40, -50))
         else -> listOf(Pair(-48, -42), Pair(-18, -66), Pair(18, -66), Pair(48, -42))
     }
+
     val qtdParaMostrar = minOf(total, posicoes.size)
+
     for (i in 0 until qtdParaMostrar) {
         val isGold = i < concluidas
         val (x, y) = posicoes[i]
-        StarImage(number = (i + 1).toString(), isGold = isGold, modifier = Modifier.align(Alignment.Center).offset(x = x.dp, y = y.dp))
+
+        StarImage(
+            number = (i + 1).toString(),
+            isGold = isGold,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(x = x.dp, y = y.dp)
+        )
     }
 }
 
 @Composable
 fun StarImage(number: String, isGold: Boolean, modifier: Modifier = Modifier) {
     val imageRes = if (isGold) R.drawable.ic_star_gold else R.drawable.ic_star_grey
+
     Box(modifier = modifier.size(38.dp), contentAlignment = Alignment.Center) {
         Image(painter = painterResource(id = imageRes), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         Text(text = number, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = BalooFontFamily, textAlign = TextAlign.Center, modifier = Modifier.align(Alignment.Center))
@@ -519,6 +414,7 @@ fun StarImage(number: String, isGold: Boolean, modifier: Modifier = Modifier) {
 fun TextGroup(moduloEstado: ModuloEstado, isLeftAligned: Boolean, modifier: Modifier = Modifier) {
     val textAlign = if (isLeftAligned) TextAlign.Start else TextAlign.End
     val alignment = if (isLeftAligned) Alignment.Start else Alignment.End
+
     val tituloColor = if (moduloEstado.isBloqueado) HomeStyles.TextLockedColor else HomeStyles.BlueBanner
     val descColor = if (moduloEstado.isBloqueado) HomeStyles.TextLockedColor else HomeStyles.TextModuloColor
 
@@ -528,14 +424,34 @@ fun TextGroup(moduloEstado: ModuloEstado, isLeftAligned: Boolean, modifier: Modi
     }
 }
 
+// ========================================================================
+// 5. HUD E COMPONENTES AUXILIARES
+// ========================================================================
+
 @Composable
 fun GameHUD(moedas: Int, vidas: Int, xp: Int) {
     Column {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusPill(icon = painterResource(id = R.drawable.ic_robot_face), value = xp.toString(), iconSize = 52.dp, textPaddingStart = 44.dp, iconOffsetY = (-6).dp)
+                StatusPill(
+                    icon = painterResource(id = R.drawable.ic_robot_face),
+                    value = xp.toString(),
+                    iconSize = 52.dp,
+                    textPaddingStart = 44.dp,
+                    iconOffsetY = (-6).dp
+                )
                 Spacer(modifier = Modifier.width(12.dp))
-                StatusPill(icon = painterResource(id = R.drawable.ic_coin), value = moedas.toString(), textPaddingStart = 40.dp)
+                StatusPill(
+                    icon = painterResource(id = R.drawable.ic_coin),
+                    value = moedas.toString(),
+                    textPaddingStart = 40.dp
+                )
             }
             HeartDisplay(lives = vidas)
         }
@@ -588,17 +504,55 @@ fun BubbleTail(color: Color, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun GameButton3D(
-    text: String,
-    onClick: () -> Unit,
-    mainColor: Color,
-    shadowColor: Color,
-    borderColor: Color,
-    textColor: Color,
-    enabled: Boolean = true,
-    height: Dp = 70.dp,
-    fontSize: androidx.compose.ui.unit.TextUnit = 18.sp
-) {
+fun NoLivesDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(text = "Vidas Esgotadas!", fontFamily = BalooFontFamily, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = HomeStyles.DialogTitle, textAlign = TextAlign.Center)
+            }
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Image(painter = painterResource(id = R.drawable.ic_heart_grey), contentDescription = null, modifier = Modifier.size(80.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "Você precisa descansar um pouco para recuperar suas energias.\nVolte amanhã!", fontFamily = Baloo2FontFamily, fontSize = 18.sp, color = HomeStyles.DialogText, textAlign = TextAlign.Center, lineHeight = 24.sp)
+                Spacer(modifier = Modifier.height(32.dp))
+                GameButton3D(text = "ENTENDI", onClick = onDismiss, mainColor = HomeStyles.BlueBanner, shadowColor = HomeStyles.DarkBlueBanner, borderColor = HomeStyles.DarkBlueBanner, textColor = Color.White, height = 60.dp, fontSize = 20.sp)
+            }
+        },
+        confirmButton = { },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(24.dp)
+    )
+}
+
+@Composable
+fun ModuleCompletedDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text(text = "Módulo Dominado!", fontFamily = BalooFontFamily, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = HomeStyles.GoldColor, textAlign = TextAlign.Center)
+            }
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Image(painter = painterResource(id = R.drawable.ic_star_gold), contentDescription = null, modifier = Modifier.size(80.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "Parabéns! Você já completou todas as lições deste módulo.\nVocê é um expert!", fontFamily = Baloo2FontFamily, fontSize = 18.sp, color = HomeStyles.DialogText, textAlign = TextAlign.Center, lineHeight = 24.sp)
+                Spacer(modifier = Modifier.height(32.dp))
+                GameButton3D(text = "SHOW DE BOLA", onClick = onDismiss, mainColor = HomeStyles.BlueBanner, shadowColor = HomeStyles.DarkBlueBanner, borderColor = HomeStyles.DarkBlueBanner, textColor = Color.White, height = 60.dp, fontSize = 20.sp)
+            }
+        },
+        confirmButton = { },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(24.dp)
+    )
+}
+
+@Composable
+fun GameButton3D(text: String, onClick: () -> Unit, mainColor: Color, shadowColor: Color, borderColor: Color, textColor: Color, enabled: Boolean = true, height: Dp = 70.dp, fontSize: TextUnit = 18.sp) {
     val cornerRadius = 12.dp
     val shadowHeight = 5.dp
     val borderWidth = 2.dp

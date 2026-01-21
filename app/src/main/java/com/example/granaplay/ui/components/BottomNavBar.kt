@@ -2,7 +2,17 @@ package com.example.granaplay.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -16,23 +26,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 
 // ========================================================================
-// CONFIGURAÇÕES DE ESTILO E CORES
+// CONFIGURAÇÕES VISUAIS
 // ========================================================================
 
-private val BarHeight = 60.dp
-private val TotalHeight = 80.dp // Altura considerando a aba que "salta" para cima
+private object NavBarStyles {
+    val Height = 60.dp
+    val TotalHeight = 80.dp // Altura total incluindo a aba flutuante
 
-// Cores da Aba Selecionada (Gradiente Ciano)
-private val TabGradientStart = Color(0xFF00E5FF)
-private val TabGradientEnd = Color(0xFF00838F)
+    // Gradiente da Aba Ativa (Ciano)
+    val ActiveTabGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF00E5FF), Color(0xFF00838F))
+    )
 
-// Cores da Barra de Fundo (Gradiente Azul Petróleo)
-private val BarGradientStart = Color(0xFF2C8CAE)
-private val BarGradientEnd = Color(0xFF006386)
+    // Gradiente do Fundo (Azul Petróleo)
+    val BackgroundGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF2C8CAE), Color(0xFF006386))
+    )
 
-private val DividerColor = Color(0xFF004D40)
-private val IconActiveColor = Color.White
-private val IconInactiveColor = Color.White // Pode alterar se quiser opacidade diferente
+    val DividerColor = Color(0xFF004D40)
+    val IconActiveColor = Color.White
+    val IconInactiveColor = Color.White
+}
 
 // ========================================================================
 // MODELO DE DADOS
@@ -48,6 +62,13 @@ data class BottomNavItem(
 // COMPONENTE PRINCIPAL
 // ========================================================================
 
+/**
+ * Barra de navegação inferior customizada com efeito de aba flutuante ("Floating Tab").
+ *
+ * A lógica visual funciona em duas camadas sobrepostas:
+ * 1. [BackgroundLayer]: Renderiza o fundo e os itens não selecionados.
+ * 2. [ActiveTabLayer]: Renderiza apenas a aba selecionada na posição correta usando pesos (weights).
+ */
 @Composable
 fun CustomBottomNavigation(
     items: List<BottomNavItem>,
@@ -57,23 +78,23 @@ fun CustomBottomNavigation(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(TotalHeight),
+            .height(NavBarStyles.TotalHeight),
         contentAlignment = Alignment.BottomCenter
     ) {
-        // CAMADA 1: Barra de Fundo (Itens Inativos)
-        BackgroundBar(items, currentDestinationId, onNavigate)
+        // Camada 1: Fundo e itens inativos
+        BackgroundLayer(items, currentDestinationId, onNavigate)
 
-        // CAMADA 2: Indicador Flutuante (Item Selecionado)
-        FloatingSelectedTab(items, currentDestinationId)
+        // Camada 2: Aba ativa (flutuante)
+        ActiveTabLayer(items, currentDestinationId)
     }
 }
 
 // ========================================================================
-// SUB-COMPONENTES
+// IMPLEMENTAÇÃO INTERNA
 // ========================================================================
 
 @Composable
-private fun BackgroundBar(
+private fun BackgroundLayer(
     items: List<BottomNavItem>,
     currentDestinationId: Int?,
     onNavigate: (Int) -> Unit
@@ -81,22 +102,18 @@ private fun BackgroundBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(BarHeight)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(BarGradientStart, BarGradientEnd)
-                )
-            ),
+            .height(NavBarStyles.Height)
+            .background(NavBarStyles.BackgroundGradient),
         verticalAlignment = Alignment.CenterVertically
     ) {
         items.forEachIndexed { index, item ->
             val isSelected = currentDestinationId == item.navDestinationId
 
-            // Se estiver selecionado, renderiza um espaço vazio (pois o item flutuante ocupará este lugar)
-            // Se não, renderiza o ícone clicável padrão
+            // Ocupa o espaço (weight 1f) mas só desenha o ícone se NÃO estiver selecionado.
+            // Se estiver selecionado, fica vazio para a ActiveTabLayer preencher por cima.
             Box(modifier = Modifier.weight(1f)) {
                 if (!isSelected) {
-                    UnselectedItemView(
+                    UnselectedItem(
                         item = item,
                         showDivider = index < items.size - 1,
                         onClick = { onNavigate(item.navDestinationId) }
@@ -108,36 +125,35 @@ private fun BackgroundBar(
 }
 
 @Composable
-private fun FloatingSelectedTab(
+private fun ActiveTabLayer(
     items: List<BottomNavItem>,
     currentDestinationId: Int?
 ) {
     val selectedIndex = items.indexOfFirst { it.navDestinationId == currentDestinationId }
+    if (selectedIndex == -1) return
 
-    if (selectedIndex >= 0) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            // Espaçador à esquerda (ocupa o peso equivalente aos itens anteriores)
-            if (selectedIndex > 0) {
-                Spacer(modifier = Modifier.weight(selectedIndex.toFloat()))
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        // Empurra a aba para a direita baseada na quantidade de itens anteriores
+        if (selectedIndex > 0) {
+            Spacer(modifier = Modifier.weight(selectedIndex.toFloat()))
+        }
 
-            // O Item Selecionado em si
-            SelectedTabIndicator(item = items[selectedIndex])
+        // A aba ativa em si
+        ActiveTabIndicator(item = items[selectedIndex])
 
-            // Espaçador à direita (ocupa o peso equivalente aos itens posteriores)
-            val itemsAfter = items.size - 1 - selectedIndex
-            if (itemsAfter > 0) {
-                Spacer(modifier = Modifier.weight(itemsAfter.toFloat()))
-            }
+        // Empurra o restante para preencher a linha (itens posteriores)
+        val itemsAfter = items.size - 1 - selectedIndex
+        if (itemsAfter > 0) {
+            Spacer(modifier = Modifier.weight(itemsAfter.toFloat()))
         }
     }
 }
 
 @Composable
-private fun UnselectedItemView(
+private fun UnselectedItem(
     item: BottomNavItem,
     showDivider: Boolean,
     onClick: () -> Unit
@@ -151,45 +167,40 @@ private fun UnselectedItemView(
         Icon(
             imageVector = item.icon,
             contentDescription = item.title,
-            tint = IconInactiveColor,
+            tint = NavBarStyles.IconInactiveColor,
             modifier = Modifier.size(32.dp)
         )
 
-        // Linha divisória vertical à direita
         if (showDivider) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .width(1.dp)
                     .fillMaxHeight(0.6f)
-                    .background(DividerColor)
+                    .background(NavBarStyles.DividerColor)
             )
         }
     }
 }
 
 @Composable
-private fun RowScope.SelectedTabIndicator(item: BottomNavItem) {
+private fun RowScope.ActiveTabIndicator(item: BottomNavItem) {
     Box(
         modifier = Modifier
             .weight(1f)
-            .height(TotalHeight)
-            .zIndex(1f) // Garante que fique acima da barra de fundo
+            .height(NavBarStyles.TotalHeight)
+            .zIndex(1f)
             .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(TabGradientStart, TabGradientEnd)
-                )
-            ),
+            .background(NavBarStyles.ActiveTabGradient),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = item.icon,
-            contentDescription = item.title, // Importante para acessibilidade
-            tint = IconActiveColor,
+            contentDescription = item.title,
+            tint = NavBarStyles.IconActiveColor,
             modifier = Modifier
-                .size(55.dp) // Ícone bem grande para destaque
-                .padding(bottom = 8.dp) // Ajuste visual para centralizar na parte visível
+                .size(55.dp)
+                .padding(bottom = 8.dp)
         )
     }
 }
